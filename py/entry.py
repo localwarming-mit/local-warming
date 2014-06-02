@@ -152,28 +152,30 @@ class Camera:
             
         #print "A shape: " + str(A.shape) + " and B shape: " + str(B.shape)
         #find pseudoinverse to unit frame -- least squares
-        ata = A.T*A
+        #ata = A.T*A
         U, s, V = numpy.linalg.svd(A, full_matrices=True)
-        sh = s
-        print "USV: \n" + str(U) + "\n" + str(s) + "\n" + str(V)
-        n = min(s.shape)
+        #sh = s
+        #print "USV: \n" + str(U) + "\n" + str(s) + "\n" + str(V)
+        #n = min(s.shape)
         #print "got n: ", str(n), " and ", str(s.shape)
         #print "U shape: " + str(U.shape) + " and V shape: " + str(V.shape)
-        for i in range(0, n):
-            if(sh[i] != 0):
-                sh[i] = 1.0/sh[i]
+        #for i in range(0, n):
+        #    if(sh[i] != 0):
+        #        sh[i] = 1.0/sh[i]
         
-        ata_inv = V.conj().T*numpy.diag(sh)*U.conj().T
+        #ata_inv = V.conj().T*numpy.diag(sh)*U.conj().T
         
         # get eigenvalues
         #L = numpy.dot(A.T,B)
-        L = numpy.dot(ata_inv, B)
+        #L = numpy.dot(ata_inv, B)
         #print "Here we are: ", str(L.shape)
         #affine is reconstruction of lambda
+        L = V[8,:].T
+        #L = L / numpy.linalg.norm(L)
         H = numpy.zeros((3,3))
-        for i in range(0,8):
+        for i in range(0,9):
             H[i/3,i%3] = L[i]
-        H[2,2] = 1
+        #H[2,2] = 1
         self.homography = H
         
         print "Got Homography: \n", H
