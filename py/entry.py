@@ -123,7 +123,7 @@ class Camera:
     def CalibrateFunc(self):
         #for each calibration marker, construct matrix to do least squares with
         numrows = 2*len(self.calibrationmarkers)
-        A = numpy.zeros((numrows, 8))
+        A = numpy.zeros((numrows, 9))
         B = numpy.zeros((numrows, 1))
         # marker 1: 0,0
         # marker 2: 1,0
@@ -142,9 +142,12 @@ class Camera:
             A[2*i,2] = 1; A[2*i+1,5] = 1
             A[2*i,6] = -B[2*i]*calib.pos[0]
             A[2*i,7] = -B[2*i]*calib.pos[1]
+            A[2*i,8] = -B[2*i]
             
             A[2*i+1,6] = -B[2*i+1]*calib.pos[0]
             A[2*i+1,7] = -B[2*i+1]*calib.pos[1]
+            A[2*i+1,8] = -B[2*i+1]
+            
             i = i + 1
             
         #print "A shape: " + str(A.shape) + " and B shape: " + str(B.shape)
@@ -152,6 +155,7 @@ class Camera:
         ata = A.T*A
         U, s, V = numpy.linalg.svd(A, full_matrices=True)
         sh = s
+        print "USV: \n" + str(U) + "\n" + str(s) + "\n" + str(V)
         n = min(s.shape)
         #print "got n: ", str(n), " and ", str(s.shape)
         #print "U shape: " + str(U.shape) + " and V shape: " + str(V.shape)
