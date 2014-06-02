@@ -279,6 +279,19 @@ settings = Settings()
 
 
 #Test 1
+##CompositeShow("Camera 1", cam1, settings) 
+##def mouseback_rect(event,x,y,flags,param):
+##    if event==cv.CV_EVENT_LBUTTONUP:		# here event is left mouse button double-clicked
+##        new = FrameCorrect([x,y], cam1.homography, cam1.W)
+##        print x,y, "->", new
+##        
+##        
+##
+##cv.SetMouseCallback("Camera 1", mouseback_rect);
+##cv.WaitKey()
+
+
+#Test 2
 CompositeShow("Camera 1", cam1, settings) 
 def mouseback_rect(event,x,y,flags,param):
     if event==cv.CV_EVENT_LBUTTONUP:		# here event is left mouse button double-clicked
