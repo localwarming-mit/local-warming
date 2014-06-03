@@ -1,25 +1,20 @@
 import cv
+import cv2
 import numpy
 import numpy.linalg
 import math
 
-# A = SVD - pseudoinverse 
-#
-# * * 1,1 
-# * *
-#
-#  ^
-#  |
-#
-# *     *
-#    *        *
-#
-#  
+import roslib
+#roslib.load_manifest('my_package')
+import sys
+import rospy
+
+from std_msgs.msg import String
+from sensor_msgs.msg import Image
+from cv_bridge import CvBridge, CvBridgeError
 
 # [5/29/14, 12:29:29 PM] Nick DePalma: 1- tracking ball - pictures throughout the day
 # [5/29/14, 12:30:58 PM] Nick DePalma: 2 - actually track the ball with these challenge datasets
-# [5/29/14, 12:31:30 PM] Nick DePalma: 3 - experiment with how many cameras a single machine can handle
-# [5/29/14, 12:31:40 PM] Nick DePalma: 4 - experiment with how many cameras at a distance
 
 
 
@@ -288,19 +283,100 @@ settings = Settings()
 
 
 #Test 1
-CompositeShow("Camera 1", cam1, settings) 
-def mouseback_rect(event,x,y,flags,param):
-    if event==cv.CV_EVENT_LBUTTONUP:		# here event is left mouse button double-clicked
-        new = cam1.FrameCorrect(x,y)
-        print x,y, "->", new
-        
-        
+##CompositeShow("Camera 1", cam1, settings) 
+##def mouseback_rect(event,x,y,flags,param):
+##    if event==cv.CV_EVENT_LBUTTONUP:		# here event is left mouse button double-clicked
+##        new = cam1.FrameCorrect(x,y)
+##        print x,y, "->", new
+##        
+##        
+##
+##cv.SetMouseCallback("Camera 1", mouseback_rect);
+##cv.WaitKey()
 
-cv.SetMouseCallback("Camera 1", mouseback_rect);
-cv.WaitKey()
+cv.NamedWindow("Image window", 1)
+bridge = CvBridge()
 
-
+FilterWindowName = "Filter Window "
+def nothing(da):
+    pass
     
+def setupGUI(tag):
+    global FilterWindowName
+    cv2.namedWindow(FilterWindowName+tag, 2)
+    cv2.createTrackbar(tag+" Min", FilterWindowName+tag, 128, 255, nothing)
+    cv2.createTrackbar(tag+" Max", FilterWindowName+tag, 128, 255, nothing)
+    
+    
+def FindBall(im2):
+    global FilterWindowName
+    hsv = cv2.cvtColor(im2, cv.CV_RGB2HSV)
+    [h, s, v] = cv2.split(hsv)
+    
+    #---------------------
+    high_bnd = cv2.getTrackbarPos("Hue Max", FilterWindowName+"Hue")
+    low_bnd = cv2.getTrackbarPos("Hue Min", FilterWindowName+"Hue")
+    
+    ret, hi1 = cv2.threshold(h, high_bnd, 255, cv2.THRESH_BINARY_INV)
+    ret, hi2 = cv2.threshold(h, low_bnd, 255, cv2.THRESH_BINARY)
+    
+    hi = cv2.bitwise_and(hi1, hi2)
+    cv2.imshow(FilterWindowName+"Hue", hi);
+    #---------------------
+    high_bnd = cv2.getTrackbarPos("Value Max", FilterWindowName+"Value")
+    low_bnd = cv2.getTrackbarPos("Value Min", FilterWindowName+"Value")
+    
+    ret, vi1 = cv2.threshold(v, high_bnd, 255, cv2.THRESH_BINARY_INV)
+    ret, vi2 = cv2.threshold(v, low_bnd, 255, cv2.THRESH_BINARY)
+    
+    vi = cv2.bitwise_and(vi1, vi2)
+    cv2.imshow(FilterWindowName+"Value", vi);
+    #---------------------
+    out = cv2.bitwise_and(vi, hi)
+
+    cv2.imshow(FilterWindowName, out);
+    return out
+##    CC = bwconncomp(out);
+##    numPixels = cellfun(@numel,CC.PixelIdxList);
+##    if(size(numPixels, 2) ~= 0),
+##        [biggest,idx] = max(numPixels);
+##
+##        S = regionprops(CC,'Centroid');
+##        ballPos = S(idx).Centroid;
+##    else
+##        ballPos = [0 0];
+
+
+def image_call(data):
+    try:
+      cv_image = bridge.imgmsg_to_cv2(data, "rgb8")
+    except CvBridgeError, e:
+      print e
+
+##    (rows,cols,channels) = cv_image.shape
+##    if cols > 60 and rows > 60 :
+##      cv2.circle(cv_image, (50,50), 10, 255)
+    
+    cv.ShowImage("Image window", cv.fromarray(numpy.array(cv_image[::2,::2,::-1])))
+    FindBall(cv_image)
+    cv.WaitKey(3)
+
+setupGUI("Hue")
+setupGUI("Value")
+
+image_sub = rospy.Subscriber("/camera/rgb/image_color",Image,image_call)
+
+rospy.init_node('image_converter', anonymous=True)
+
+
+
+
+try:
+    rospy.spin()
+except KeyboardInterrupt:
+    print "Shutting down"
+
+cv.DestroyAllWindows()
 
 #play all until one dies
 #while(im1 != None and im2 != None and
