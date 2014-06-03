@@ -3,7 +3,8 @@ import cv2
 import numpy
 import numpy.linalg
 import math
-
+import socket
+import sys
 
 
 class CalibrationMarker:
@@ -27,7 +28,6 @@ class CalibrationMarker:
 
 calibCap = None
 def MouseCalibrate(image, markers):
-    global calibImage
     windowName = "Choose Point";
     cv.NamedWindow(windowName)
     gotPoint = [False]*len(markers);
@@ -379,21 +379,25 @@ hier = None
 def PickBlob(im):
     global cntrs, hier
     [cntrs, hier] = cv2.findContours(im, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE, cntrs, hier)
-    maxArea = 0;
-    maxCntr = None
+
+    high_bnd = cv2.getTrackbarPos(" Max", FilterWindowName)
+    low_bnd = cv2.getTrackbarPos(" Min", FilterWindowName)
+    cntrs = []
     for cntr in cntrs:
         ara = cv2.contourArea(cntr)
-        if(ara > maxArea):
-            maxArea = ara
-            maxCntr = cntr
+        if(low_band < ara < high_bnd):
+            cntrs.append(cntr)
     
-    if(maxArea > 0):
-        mu = cv2.moments(maxCntr)
+    centroids = []
+    for cntr in cntrs:
+        mu = cv2.moments(cntr)
         #print "MU: " + str(mu)
         mx = mu['m10']/mu['m00']
         my = mu['m01']/mu['m00']
-        return (mx,my)
-    return None
+        centroids.append( (mx,my) )
+    return centroids
+
+
 cap = cv2.VideoCapture(-1)
 cap.set(cv.CV_CAP_PROP_FRAME_WIDTH , 320); 
 cap.set(cv.CV_CAP_PROP_FRAME_HEIGHT , 240);
@@ -403,6 +407,40 @@ for i in range(0,20):
     ret, cv_image = cap.retrieve()
     cv.WaitKey(100)
 
+class TCPClient:
+    def __init__(self, Address, Port):
+        self.open_server()
+
+    def open_server(self):
+        # Create a TCP/IP socket
+        self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+
+        # Connect the socket to the port where the server is listening
+        server_address = (Address, Port)
+        print >>sys.stderr, 'connecting to %s port %s' % server_address
+        self.sock.connect(server_address)
+
+    def send(self, pts):
+        try:
+            i = 0
+            for pt in pts:
+                # the data should be sent as 3 comma separated values with a total length of 19 characters. 
+                # 1 for id, 8 for x, 8 for y
+                # [ i,xxxxxxxx,yyyyyyyy ]
+                message = '' + str(i) + ',' + ("%8f" % pt[0]) + ',' + ("%8f" % pt[1])
+
+                # Send data            
+                sock.sendall(message)
+                i = i + 1
+                if(i == 10):
+                    break
+        except:
+            pass
+
+    
+tcpc = TCPClient('localhost', 4558)
+
+
 calibCap = cap    
 def image_call():
     global FilterWindowName
@@ -410,22 +448,27 @@ def image_call():
     if(ret):
         filtered = FindBall(cv_image)
         cv2.imshow(FilterWindowName, filtered)
-        mc = PickBlob(filtered)
-        if(mc != None):
+        mcs = PickBlob(filtered)
+        for mc in mcs:
             cv2.circle(cv_image, (int(mc[0]), int(mc[1])), 3, cv.Scalar(255, 0, 0))
         #cv_image = cv2.cvtColor(cv_image, cv.CV_BGR2RGB)
         cvIm = cv.CreateImageHeader((cv_image.shape[1], cv_image.shape[0]), cv.IPL_DEPTH_8U, 3)
         cv.SetData(cvIm, cv_image.tostring(), 
                cv_image.dtype.itemsize * 3 * cv_image.shape[1])
-        calibImage = cvIm
         CompositeShow("Image window", cam1, cvIm, settings)
-        if(mc != None):
+        #correct the frame 
+        tosend = []
+        for mc in mcs:
             new = cam1.FrameCorrect(mc[0],mc[1])
             
             rectified = unit2world(new)
             
             #print "Ball: ", str(mc), " -> ", str(new)
-            print "Ball: ", str(mc), " -> ", str(rectified)
+            #print "Ball: ", str(mc), " -> ", str(rectified)
+            tosend.append(rectified)
+        
+        #now send it!
+        tcpc.send(tosend)
 
         cv.WaitKey(3)
 
@@ -434,6 +477,7 @@ setupGUI("Hue", 115, 128)
 #setupGUI("Hue")
 setupGUI("Value", 218, 255)
 # setupGUI("Value")
+setupGUI("", 218, 1000)
 
 if(NeedsToSave):
     Save("prefs.txt", cameras);
