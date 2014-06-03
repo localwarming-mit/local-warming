@@ -4,18 +4,6 @@ import numpy
 import numpy.linalg
 import math
 
-import roslib
-#roslib.load_manifest('my_package')
-import sys
-import rospy
-
-from std_msgs.msg import String
-from sensor_msgs.msg import Image
-from cv_bridge import CvBridge, CvBridgeError
-
-# [5/29/14, 12:29:29 PM] Nick DePalma: 1- tracking ball - pictures throughout the day
-# [5/29/14, 12:30:58 PM] Nick DePalma: 2 - actually track the ball with these challenge datasets
-
 
 
 class CalibrationMarker:
@@ -37,9 +25,9 @@ class CalibrationMarker:
         return False
         
 
-
+calibCap = None
 def MouseCalibrate(image, markers):
-    
+    global calibImage
     windowName = "Choose Point";
     cv.NamedWindow(windowName)
     gotPoint = [False]*len(markers);
@@ -60,6 +48,8 @@ def MouseCalibrate(image, markers):
         
         #ask for pt
         while not gotPoint[ind[0]]:
+            ret, calibImage = calibCap.retrieve()
+            cv2.imshow(windowName, calibImage);
             cv.WaitKey(1);
             
         #add point to matrix
@@ -91,13 +81,15 @@ class Camera:
             self.capture = cv.CaptureFromFile(id);
             id = int(id[-5])
         else: #i'm a numeric id
-            self.capture = cv.CaptureFromCAM(id);
+            self.capture = cv.CaptureFromFile("../cam1.mov")
+            #self.capture = cv2.VideoCapture(id);
 
         self.calibrated = False
         self.id = id;
 
     def next(self):
-        self.cur = cv.QueryFrame(self.capture)
+        #self.cur = self.capture.retrieve()
+        self.cur = None
         return self.cur;
     def Save(self, f, prefix=""):
         for calib in self.calibrationmarkers:
@@ -210,10 +202,12 @@ def Load(filename, cameras):
 
 
 def CompositeShow(windowName, camera, image, settings, pts=[]):
+    global Uncalibrated
     cv.NamedWindow(windowName)
     comp = cv.CloneImage(image)
     if(Uncalibrated):
         CalibrateCameras(comp)
+        Uncalibrated = False
     
     if(settings.showGrid):
         #draw lines
@@ -239,18 +233,18 @@ def CompositeShow(windowName, camera, image, settings, pts=[]):
     cv.ShowImage(windowName, comp)
 
 
-cam1 = Camera("../cam1.mov");
+cam1 = Camera(-1);
 cam2 = Camera("../cam2.mov");
 cam3 = Camera("../cam3.mov");
 cam4 = Camera("../cam4.mov");
 
-cameras = [cam1,cam2,cam3,cam4]
+cameras = [cam1]#,cam2,cam3,cam4]
 
 im1 = cam1.next()
-cv.SaveImage("test.jpg", im1)
-im2 = cam2.next()
-im3 = cam3.next()
-im4 = cam4.next()
+#cv.SaveImage("test.jpg", im1)
+#im2 = cam2.next()
+#im3 = cam3.next()
+#im4 = cam4.next()
 
 Load("prefs.txt", cameras);
 ManualCalibrate = True;
@@ -269,16 +263,44 @@ def CalibrateCameras(imageOverRide = None):
         [cam.Calibrate(ManualCalibrate, imageOverRide) for cam in cameras]
 
 
+g_a = None
+g_b = None
 
- 
+#Calibrate unit->world
+
+#lightblue/pink/green/darkblue
+g_px = numpy.array([0.4, 2.3, 4.2, 2.3])
+g_py = numpy.array([2.44, 0.4, 2.44, 4.48])
+#g_px = numpy.array([2.3,  0.4,  2.3, 4.2])
+#g_py = numpy.array([4.48, 2.44, 0.4, 2.44])
+
+#compute coefficients
+AI = numpy.mat('1 0 0 0;-1 1 0 0;-1 0 0 1;1 -1 1 -1')
 
 
+g_a = numpy.dot(AI, g_px)
+g_a = numpy.squeeze(g_a)
+#print "g_a: \n", str(g_a)
+g_b = numpy.dot(AI, g_py)
+g_b = numpy.squeeze(g_b)
+#print "g_b: \n", str(g_b)
+
+
+def unit2world(pos):
+    g = pos[0]
+    h = pos[1]
+    k = g*h
+    unit = numpy.bmat([[[1], [g], [h], [k]]])
+    world_x = numpy.asscalar(numpy.dot(g_a, unit.T))
+    world_y = numpy.asscalar(numpy.dot(g_b, unit.T))
+    return (world_x, world_y)
+
+#test 
+#print "unit2world 0,0: \n", str(unit2world([0,0]))
+#print "unit2world 1,0: \n", str(unit2world([1,0]))
+#print "unit2world 0 1: \n", str(unit2world([0,1]))
+#print "unit2world 1 1: \n", str(unit2world([1,1]))
 # 4 different colors, find those, autocalibrate
-
-# teamviewer - disconnected
-
-# two cameras working real time
-# affine transform
 
 
 # -> calib per camera
@@ -302,17 +324,17 @@ settings = Settings()
 ##cv.WaitKey()
 
 cv.NamedWindow("Image window", 1)
-bridge = CvBridge()
+
 
 FilterWindowName = "Filter Window "
 def nothing(da):
     pass
     
-def setupGUI(tag):
+def setupGUI(tag, min_default=128, max_default=128):
     global FilterWindowName
     cv2.namedWindow(FilterWindowName+tag, 2)
-    cv2.createTrackbar(tag+" Min", FilterWindowName+tag, 128, 255, nothing)
-    cv2.createTrackbar(tag+" Max", FilterWindowName+tag, 128, 255, nothing)
+    cv2.createTrackbar(tag+" Min", FilterWindowName+tag, min_default, 255, nothing)
+    cv2.createTrackbar(tag+" Max", FilterWindowName+tag, max_default, 255, nothing)
     
     
 def FindBall(im2):
@@ -372,54 +394,59 @@ def PickBlob(im):
         my = mu['m01']/mu['m00']
         return (mx,my)
     return None
+cap = cv2.VideoCapture(-1)
+cap.set(cv.CV_CAP_PROP_FRAME_WIDTH , 320); 
+cap.set(cv.CV_CAP_PROP_FRAME_HEIGHT , 240);
+cap.set(cv.CV_CAP_PROP_FPS, 20); 
+cap.set(cv.CV_CAP_PROP_FOURCC, cv.CV_FOURCC('R', 'G', 'B', '3'))
+for i in range(0,20):
+    ret, cv_image = cap.retrieve()
+    cv.WaitKey(100)
 
-def image_call(data):
+calibCap = cap    
+def image_call():
     global FilterWindowName
-    try:
-      cv_image = bridge.imgmsg_to_cv2(data, "rgb8")
-    except CvBridgeError, e:
-      print e
+    ret, cv_image = cap.retrieve()
+    if(ret):
+        filtered = FindBall(cv_image)
+        cv2.imshow(FilterWindowName, filtered)
+        mc = PickBlob(filtered)
+        if(mc != None):
+            cv2.circle(cv_image, (int(mc[0]), int(mc[1])), 3, cv.Scalar(255, 0, 0))
+        #cv_image = cv2.cvtColor(cv_image, cv.CV_BGR2RGB)
+        cvIm = cv.CreateImageHeader((cv_image.shape[1], cv_image.shape[0]), cv.IPL_DEPTH_8U, 3)
+        cv.SetData(cvIm, cv_image.tostring(), 
+               cv_image.dtype.itemsize * 3 * cv_image.shape[1])
+        calibImage = cvIm
+        CompositeShow("Image window", cam1, cvIm, settings)
+        if(mc != None):
+            new = cam1.FrameCorrect(mc[0],mc[1])
+            
+            rectified = unit2world(new)
+            
+            #print "Ball: ", str(mc), " -> ", str(new)
+            print "Ball: ", str(mc), " -> ", str(rectified)
 
-##    (rows,cols,channels) = cv_image.shape
-##    if cols > 60 and rows > 60 :
-##      cv2.circle(cv_image, (50,50), 10, 255)
-    
-    filtered = FindBall(cv_image)
-    cv2.imshow(FilterWindowName, filtered)
-    mc = PickBlob(filtered)
-    if(mc != None):
-        cv2.circle(cv_image, (int(mc[0]), int(mc[1])), 3, cv.Scalar(255, 0, 0))
-    cv_image = cv2.cvtColor(cv_image, cv.CV_BGR2RGB)
-    cvIm = cv.CreateImageHeader((cv_image.shape[1], cv_image.shape[0]), cv.IPL_DEPTH_8U, 3)
-    cv.SetData(cvIm, cv_image.tostring(), 
-           cv_image.dtype.itemsize * 3 * cv_image.shape[1])
-    CompositeShow("Image window", cam1, cvIm, settings)
-    if(mc != None):
-        new = cam1.FrameCorrect(mc[0],mc[1])
-        print "Ball: ", str(mc), " -> ", str(new)
+        cv.WaitKey(3)
 
-    cv.WaitKey(3)
+#set up with sane defaults
+setupGUI("Hue", 115, 128)
+#setupGUI("Hue")
+setupGUI("Value", 218, 255)
+# setupGUI("Value")
 
-setupGUI("Hue")
-setupGUI("Value")
+if(NeedsToSave):
+    Save("prefs.txt", cameras);
 
-image_sub = rospy.Subscriber("/camera/rgb/image_color",Image,image_call)
-
-rospy.init_node('image_converter', anonymous=True)
-
-
-
-
-try:
-    rospy.spin()
-except KeyboardInterrupt:
-    print "Shutting down"
-
+while(True):
+    image_call()
+    if(NeedsToSave):
+        Save("prefs.txt", cameras);
+        NeedsToSave = False
 cv.DestroyAllWindows()
 
    
-if(NeedsToSave):
-    Save("prefs.txt", cameras);
+
 
 #play all until one dies
 #while(im1 != None and im2 != None and
