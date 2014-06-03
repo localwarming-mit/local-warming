@@ -334,8 +334,37 @@ def FindBall(im2):
     #---------------------
     out = cv2.bitwise_and(vi, hi)
 
-    cv2.imshow(FilterWindowName, out);
+    
     return out
+
+def ErodeTrick(im):
+    cv2.erode(im, im, None, 3)
+    cv2.dilate(im, im, None, 3)
+    
+    cv2.dilate(im, im, None, 3)
+    cv2.erode(im, im, None, 3)
+    return im
+
+cntrs = None
+hier = None
+def PickBlob(im):
+    global cntrs, hier
+    [cntrs, hier] = cv2.findContours(im, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE, cntrs, hier)
+    maxArea = 0;
+    maxCntr = None
+    for cntr in cntrs:
+        ara = cv2.contourArea(cntr)
+        if(ara > maxArea):
+            maxArea = ara
+            maxCntr = cntr
+    
+    if(maxArea > 0):
+        mu = cv2.moments(maxCntr)
+        #print "MU: " + str(mu)
+        mx = mu['m10']/mu['m00']
+        my = mu['m01']/mu['m00']
+        return (mx,my)
+    return None
 ##    CC = bwconncomp(out);
 ##    numPixels = cellfun(@numel,CC.PixelIdxList);
 ##    if(size(numPixels, 2) ~= 0),
@@ -348,6 +377,7 @@ def FindBall(im2):
 
 
 def image_call(data):
+    global FilterWindowName
     try:
       cv_image = bridge.imgmsg_to_cv2(data, "rgb8")
     except CvBridgeError, e:
@@ -357,8 +387,12 @@ def image_call(data):
 ##    if cols > 60 and rows > 60 :
 ##      cv2.circle(cv_image, (50,50), 10, 255)
     
+    filtered = FindBall(cv_image)
+    cv2.imshow(FilterWindowName, filtered)
+    mc = PickBlob(filtered)
+    if(mc != None):
+        cv2.circle(cv_image, (int(mc[0]), int(mc[1])), 3, cv.Scalar(0, 255, 0))
     cv.ShowImage("Image window", cv.fromarray(numpy.array(cv_image[::2,::2,::-1])))
-    FindBall(cv_image)
     cv.WaitKey(3)
 
 setupGUI("Hue")
