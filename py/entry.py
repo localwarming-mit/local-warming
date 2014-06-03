@@ -1,6 +1,7 @@
 import cv
 import numpy
 import numpy.linalg
+import math
 
 # A = SVD - pseudoinverse 
 #
@@ -127,62 +128,74 @@ class Camera:
         B = numpy.zeros((numrows, 1))
         # marker 1: 0,0
         # marker 2: 1,0
-        # marker 3: 0,1
-        # marker 4: 1,1
+        # marker 3: 1,1
+        # marker 4: 0,1
         #B(0),B(1) = 0   #marker 1
         B[2] = 1; B[5]=1 #marker 2,3
         B[4] = 1;
         B[6] = 0; B[7]=1 
         #B[3] = 1; B[4]=1 #marker 2,3
         #B[6] = 1; B[7]=1 #marker 4
+        
+        
+        #create our polygon
+        self.px = numpy.array([-1, 8, 13, -4])
+        self.py = numpy.array([-1, 3, 11, 8])  
         i = 0
         for calib in self.calibrationmarkers:
-            A[2*i, 0] = calib.pos[0]; A[2*i, 1] = calib.pos[1]
-            A[2*i+1, 3] = calib.pos[0]; A[2*i+1, 4] = calib.pos[1]
-            A[2*i,2] = 1; A[2*i+1,5] = 1
-            A[2*i,6] = -B[2*i]*calib.pos[0]
-            A[2*i,7] = -B[2*i]*calib.pos[1]
-            A[2*i,8] = -B[2*i]
-            
-            A[2*i+1,6] = -B[2*i+1]*calib.pos[0]
-            A[2*i+1,7] = -B[2*i+1]*calib.pos[1]
-            A[2*i+1,8] = -B[2*i+1]
-            
+            self.px[(3+i)%4] = calib.pos[0]
+            self.py[(3+i)%4] = -calib.pos[1]
             i = i + 1
-            
-        #print "A shape: " + str(A.shape) + " and B shape: " + str(B.shape)
-        #find pseudoinverse to unit frame -- least squares
-        #ata = A.T*A
-        U, s, V = numpy.linalg.svd(A, full_matrices=True)
-        #sh = s
-        #print "USV: \n" + str(U) + "\n" + str(s) + "\n" + str(V)
-        #n = min(s.shape)
-        #print "got n: ", str(n), " and ", str(s.shape)
-        #print "U shape: " + str(U.shape) + " and V shape: " + str(V.shape)
-        #for i in range(0, n):
-        #    if(sh[i] != 0):
-        #        sh[i] = 1.0/sh[i]
         
-        #ata_inv = V.conj().T*numpy.diag(sh)*U.conj().T
         
-        # get eigenvalues
-        #L = numpy.dot(A.T,B)
-        #L = numpy.dot(ata_inv, B)
-        #print "Here we are: ", str(L.shape)
-        #affine is reconstruction of lambda
-        L = V[8,:].T
-        #L = L / numpy.linalg.norm(L)
-        H = numpy.zeros((3,3))
-        for i in range(0,9):
-            H[i/3,i%3] = L[i]
-        #H[2,2] = 1
-        self.homography = H
+        print "PX: \n", str(self.px)
+        print "PY: \n", str(self.py)
+        #compute coefficients
         
-        print "Got Homography: \n", H
-        print "Got L: \n", L
-        print "From: \n", A
-        self.W = numpy.array([H[2,0], H[2,1], 1])
-        return H
+        #A=numpy.mat('1 0 0 0;1 1 0 0;1 1 1 1;1 0 1 0')
+        #print "A: \n", str(A)
+        #AI = numpy.invert(A)
+        AI = numpy.mat('1 0 0 0;-1 1 0 0;-1 0 0 1;1 -1 1 -1')
+
+        #print "AI: \n", str(AI)
+        #print "shapes: ", str(AI.shape), " and ", str(self.px.T.shape)
+        self.a = numpy.dot(AI, self.px)
+        self.a = numpy.squeeze(self.a)
+        print "a: \n", str(self.a)
+        self.b = numpy.dot(AI, self.py)
+        self.b = numpy.squeeze(self.b)
+        print "b: \n", str(self.b)
+
+        #classify points as internal or external
+        #plot_internal_and_external_points(px,py,a,b);
+
+        return self.a, self.b
+    
+    # converts physical (x,y) to logical (l,m)
+    def FrameCorrect(self, x, y):
+        #quadratic equation coeffs, aa*mm^2+bb*m+cc=0
+        #y = 240 - y
+        y = -y
+        a = self.a
+        b = self.b
+        aa = a[0,3]*b[0,2] - a[0,2]*b[0,3]
+        bb = a[0,3]*b[0,0] -a[0,0]*b[0,3] + a[0,1]*b[0,2] - a[0,2]*b[0,1] + x*b[0,3] - y*a[0,3]
+        cc = a[0,1]*b[0,0] -a[0,0]*b[0,1] + x*b[0,1] - y*a[0,1]
+        #compute m = (-b+sqrt(b^2-4ac))/(2a)
+        det = math.sqrt(bb*bb - 4*aa*cc);
+        m = (-bb+det)/(2*aa);
+        
+        #compute l
+        l = (x-a[0,0]-a[0,2]*m)/(a[0,1]+a[0,3]*m)
+        return l,m
+
+
+#point in quad
+def PointInQuad(m,l):
+    #is the point outside the quad?
+    if (m<0 or m>1 or l<0 or l>1):
+        return True
+    return False
 
 def Load(filename, cameras):
     f = open(filename, "r")
@@ -195,17 +208,11 @@ def Load(filename, cameras):
             camera.Load(line)
         line = f.readline()
 
-def FrameCorrect(point, transform, W):
-    hmgneus = numpy.zeros(3)
-    hmgneus[0] = point[0]
-    hmgneus[1] = point[1]
-    hmgneus[2] = 1
-    xw = numpy.dot(transform,hmgneus)
-    Ws = numpy.dot(W, hmgneus)
-    
-    return (xw[0]/Ws, xw[1]/Ws)
 
-def CompositeShow(windowName, camera, settings):
+
+
+
+def CompositeShow(windowName, camera, settings, pts=[]):
     cv.NamedWindow(windowName)
     comp = cv.CloneImage(camera.cur)
     
@@ -227,7 +234,9 @@ def CompositeShow(windowName, camera, settings):
         #p2 - p3
         cv.Line(comp, tuple(camera.calibrationmarkers[1].pos), \
                       tuple(camera.calibrationmarkers[2].pos), cv.Scalar(0, 255, 0), 1, cv.CV_AA)
-        
+    
+    for pt in pts:
+        cv.Circle(comp, (int(pt[0]), int(pt[1])), 3, cv.Scalar(255, 0, 0))
     cv.ShowImage(windowName, comp)
 
 cam1 = Camera("../cam1.mov");
@@ -279,29 +288,19 @@ settings = Settings()
 
 
 #Test 1
-##CompositeShow("Camera 1", cam1, settings) 
-##def mouseback_rect(event,x,y,flags,param):
-##    if event==cv.CV_EVENT_LBUTTONUP:		# here event is left mouse button double-clicked
-##        new = FrameCorrect([x,y], cam1.homography, cam1.W)
-##        print x,y, "->", new
-##        
-##        
-##
-##cv.SetMouseCallback("Camera 1", mouseback_rect);
-##cv.WaitKey()
-
-
-#Test 2
 CompositeShow("Camera 1", cam1, settings) 
 def mouseback_rect(event,x,y,flags,param):
     if event==cv.CV_EVENT_LBUTTONUP:		# here event is left mouse button double-clicked
-        new = FrameCorrect([x,y], cam1.homography, cam1.W)
+        new = cam1.FrameCorrect(x,y)
         print x,y, "->", new
         
         
 
 cv.SetMouseCallback("Camera 1", mouseback_rect);
 cv.WaitKey()
+
+
+    
 
 #play all until one dies
 #while(im1 != None and im2 != None and

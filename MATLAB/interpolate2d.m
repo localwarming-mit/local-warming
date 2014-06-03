@@ -10,26 +10,35 @@
 function []=interpolate2d()
 
 	%create our polygon
-	px = [-1, 8, 13, -4];
-	py = [-1, 3, 11, 8];
+	%px = [-1, 8, 13, -4]
+	%py = [-1, 3, 11, 8]
+    px = [247 301 162  83];
+    py = [-102  -41  -36  -63];
+
+    %185 64 -> (2.862063369471008, 2.3424027352297454)
 
 	%compute coefficients
 	A=[1 0 0 0;1 1 0 0;1 1 1 1;1 0 1 0];
 	AI = inv(A);
 	a = AI*px';
 	b = AI*py';
-
+    
+    [r, k] = XtoL(150,50,a,b);
+    r
+    k
 	%plot random internal points
-	plot_points_in_poly(px,py,a,b);
+	%plot_points_in_poly(px,py,a,b);
 
 	%classify points as internal or external
 	plot_internal_and_external_points(px,py,a,b);
 
 	%scatter data 
-	scatter_data(px,py,a,b);
+	%scatter_data(px,py,a,b);
 	
 	%gather_data
-	gather_data(px,py,a,b);
+	%gather_data(px,py,a,b);
+    
+    
 	
 end
 
