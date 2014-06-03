@@ -108,11 +108,13 @@ class Camera:
         self.LdCounter += iscalib.count(True)
         self.calibrated = self.calibrated or self.LdCounter == len(self.calibrationmarkers)
 
-    def Calibrate(self, withMouse):
+    def Calibrate(self, withMouse, imageOverride = None):
+        if(imageOverride == None):
+            imageOverride = self.cur
         if(withMouse):
-            MouseCalibrate(self.cur, self.calibrationmarkers);
+            MouseCalibrate(imageOverride, self.calibrationmarkers);
         else:
-            AutoCalibrate(self.cur, self.calibrationmarkers);
+            AutoCalibrate(imageOverride, self.calibrationmarkers);
         self.CalibrateFunc()
         self.calibrated = True
 
@@ -207,9 +209,11 @@ def Load(filename, cameras):
 
 
 
-def CompositeShow(windowName, camera, settings, pts=[]):
+def CompositeShow(windowName, camera, image, settings, pts=[]):
     cv.NamedWindow(windowName)
-    comp = cv.CloneImage(camera.cur)
+    comp = cv.CloneImage(image)
+    if(Uncalibrated):
+        CalibrateCameras(comp)
     
     if(settings.showGrid):
         #draw lines
@@ -234,6 +238,7 @@ def CompositeShow(windowName, camera, settings, pts=[]):
         cv.Circle(comp, (int(pt[0]), int(pt[1])), 3, cv.Scalar(255, 0, 0))
     cv.ShowImage(windowName, comp)
 
+
 cam1 = Camera("../cam1.mov");
 cam2 = Camera("../cam2.mov");
 cam3 = Camera("../cam3.mov");
@@ -249,21 +254,23 @@ im4 = cam4.next()
 
 Load("prefs.txt", cameras);
 ManualCalibrate = True;
-
+#print "calibs: " + str([x.calibrated for x in cameras])
 NeedsToSave = False
-print "calibs: " + str([x.calibrated for x in cameras])
+Uncalibrated = not reduce(lambda a,b: a and b, [x.calibrated for x in cameras])
+
+if(not Uncalibrated):
+   [cam.CalibrateFunc() for cam in cameras]
+def CalibrateCameras(imageOverRide = None):
+    global NeedsToSave, cameras, Uncalibrated
+    if(Uncalibrated):
+        #recalibrate
+        NeedsToSave = True
+        Uncalibrated = True
+        [cam.Calibrate(ManualCalibrate, imageOverRide) for cam in cameras]
 
 
-if(not reduce(lambda a,b: a and b, [x.calibrated for x in cameras])):
-    #recalibrate
-    NeedsToSave = True
-    [cam.Calibrate(ManualCalibrate) for cam in cameras]
-else:
-    [cam.CalibrateFunc() for cam in cameras]
-    
-if(NeedsToSave):
-    Save("prefs.txt", cameras);
 
+ 
 
 
 # 4 different colors, find those, autocalibrate
@@ -365,16 +372,6 @@ def PickBlob(im):
         my = mu['m01']/mu['m00']
         return (mx,my)
     return None
-##    CC = bwconncomp(out);
-##    numPixels = cellfun(@numel,CC.PixelIdxList);
-##    if(size(numPixels, 2) ~= 0),
-##        [biggest,idx] = max(numPixels);
-##
-##        S = regionprops(CC,'Centroid');
-##        ballPos = S(idx).Centroid;
-##    else
-##        ballPos = [0 0];
-
 
 def image_call(data):
     global FilterWindowName
@@ -391,8 +388,16 @@ def image_call(data):
     cv2.imshow(FilterWindowName, filtered)
     mc = PickBlob(filtered)
     if(mc != None):
-        cv2.circle(cv_image, (int(mc[0]), int(mc[1])), 3, cv.Scalar(0, 255, 0))
-    cv.ShowImage("Image window", cv.fromarray(numpy.array(cv_image[::2,::2,::-1])))
+        cv2.circle(cv_image, (int(mc[0]), int(mc[1])), 3, cv.Scalar(255, 0, 0))
+    cv_image = cv2.cvtColor(cv_image, cv.CV_BGR2RGB)
+    cvIm = cv.CreateImageHeader((cv_image.shape[1], cv_image.shape[0]), cv.IPL_DEPTH_8U, 3)
+    cv.SetData(cvIm, cv_image.tostring(), 
+           cv_image.dtype.itemsize * 3 * cv_image.shape[1])
+    CompositeShow("Image window", cam1, cvIm, settings)
+    if(mc != None):
+        new = cam1.FrameCorrect(mc[0],mc[1])
+        print "Ball: ", str(mc), " -> ", str(new)
+
     cv.WaitKey(3)
 
 setupGUI("Hue")
@@ -411,6 +416,10 @@ except KeyboardInterrupt:
     print "Shutting down"
 
 cv.DestroyAllWindows()
+
+   
+if(NeedsToSave):
+    Save("prefs.txt", cameras);
 
 #play all until one dies
 #while(im1 != None and im2 != None and
