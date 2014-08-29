@@ -9,6 +9,7 @@ import io
 import time
 import picamera
 
+current_milli_time = lambda: round(time.time() * 1000)
 
 class CalibrationMarker:
     def __init__(self, UID):
@@ -32,7 +33,7 @@ class CalibrationMarker:
 calibCap = None
 def MouseCalibrate(image, markers):
     windowName = "Choose Point";
-    cv.NamedWindow(windowName)
+#    cv.NamedWindow(windowName)
     gotPoint = [False]*len(markers);
     ind = [0]
     pt = [0,0]
@@ -46,13 +47,13 @@ def MouseCalibrate(image, markers):
     cv.SetMouseCallback(windowName, mouseback);
     for i in range(0, len(markers)):
         #redisplay image and title
-        cv.ShowImage(windowName, image);
+#        cv.ShowImage(windowName, image);
         ind[0] = i
 
         #ask for pt
         while not gotPoint[ind[0]]:
             ret, calibImage = calibCap.retrieve()
-            cv2.imshow(windowName, calibImage);
+#            cv2.imshow(windowName, calibImage);
             cv.WaitKey(1);
 
         #add point to matrix
@@ -206,7 +207,7 @@ def Load(filename, cameras):
 
 def CompositeShow(windowName, camera, image, settings, pts=[]):
     global Uncalibrated
-    cv.NamedWindow(windowName)
+#    cv.NamedWindow(windowName)
     comp = cv.CloneImage(image)
     if(Uncalibrated):
         CalibrateCameras(comp)
@@ -233,7 +234,7 @@ def CompositeShow(windowName, camera, image, settings, pts=[]):
 
     for pt in pts:
         cv.Circle(comp, (int(pt[0]), int(pt[1])), 3, cv.Scalar(255, 0, 0))
-    cv.ShowImage(windowName, comp)
+#    cv.ShowImage(windowName, comp)
 
 
 cam1 = Camera(-1);
@@ -326,7 +327,7 @@ settings = Settings()
 ##cv.SetMouseCallback("Camera 1", mouseback_rect);
 ##cv.WaitKey()
 
-cv.NamedWindow("Image window", 1)
+#cv.NamedWindow("Image window", 1)
 
 
 FilterWindowName = "Filter Window "
@@ -335,9 +336,9 @@ def nothing(da):
 
 def setupGUI(tag, min_default=128, max_default=128):
     global FilterWindowName
-    cv2.namedWindow(FilterWindowName+tag, 2)
-    cv2.createTrackbar(tag+" Min", FilterWindowName+tag, min_default, 255, nothing)
-    cv2.createTrackbar(tag+" Max", FilterWindowName+tag, max_default, 255, nothing)
+#    cv2.namedWindow(FilterWindowName+tag, 2)
+#    cv2.createTrackbar(tag+" Min", FilterWindowName+tag, min_default, 255, nothing)
+#    cv2.createTrackbar(tag+" Max", FilterWindowName+tag, max_default, 255, nothing)
 
 
 def FindBall(im2):
@@ -353,7 +354,7 @@ def FindBall(im2):
     ret, hi2 = cv2.threshold(h, low_bnd, 255, cv2.THRESH_BINARY)
 
     hi = cv2.bitwise_and(hi1, hi2)
-    cv2.imshow(FilterWindowName+"Hue", hi);
+#    cv2.imshow(FilterWindowName+"Hue", hi);
     #---------------------
     high_bnd = cv2.getTrackbarPos("Value Max", FilterWindowName+"Value")
     low_bnd = cv2.getTrackbarPos("Value Min", FilterWindowName+"Value")
@@ -362,7 +363,7 @@ def FindBall(im2):
     ret, vi2 = cv2.threshold(v, low_bnd, 255, cv2.THRESH_BINARY)
 
     vi = cv2.bitwise_and(vi1, vi2)
-    cv2.imshow(FilterWindowName+"Value", vi);
+#    cv2.imshow(FilterWindowName+"Value", vi);
     #---------------------
     out = cv2.bitwise_and(vi, hi)
 
@@ -412,6 +413,8 @@ def PickBlob(im):
 
 class TCPClient:
     def __init__(self, Address, Port):
+	self.Address = Address
+	self.Port = Port
         self.open_server()
 
     def open_server(self):
@@ -419,7 +422,7 @@ class TCPClient:
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
         # Connect the socket to the port where the server is listening
-        server_address = (Address, Port)
+        server_address = (self.Address, self.Port)
         print >>sys.stderr, 'connecting to %s port %s' % server_address
         self.sock.connect(server_address)
 
@@ -441,21 +444,24 @@ class TCPClient:
             pass
 
 
-tcpc = TCPClient('localhost', 4558)
+#tcpc = TCPClient('localhost', 4558)
 
 class RaspiCap:
     def __init__(self):
         stream = self.stream = io.BytesIO()
         camera = self.camera = picamera.PiCamera()
-        camera.start_preview()
+	camera.resolution = (320, 240)
+	camera.framerate = 20
+        #camera.start_preview()
         time.sleep(2)
-        camera.capture(stream, format='jpeg')
-    def __retrieve():
+        camera.capture(stream, format='bmp')
+    def retrieve(self):
         # Construct a numpy array from the stream
-        data = np.fromstring(self.stream.getvalue(), dtype=np.uint8)
+        data = numpy.fromstring(self.stream.getvalue(), dtype=numpy.uint8)
         # "Decode" the image from the array, preserving colour
         image = cv2.imdecode(data, 1)
-        return image
+	#image = None
+        return 1, image
 
 cap = RaspiCap()
 calibCap = cap
@@ -464,28 +470,28 @@ def image_call():
     ret, cv_image = cap.retrieve()
     if(ret):
         filtered = FindBall(cv_image)
-        cv2.imshow(FilterWindowName, filtered)
+#        cv2.imshow(FilterWindowName, filtered)
         mcs = PickBlob(filtered)
-        for mc in mcs:
-            cv2.circle(cv_image, (int(mc[0]), int(mc[1])), 3, cv.Scalar(255, 0, 0))
+        #for mc in mcs:
+        #    cv2.circle(cv_image, (int(mc[0]), int(mc[1])), 3, cv.Scalar(255, 0, 0))
         #cv_image = cv2.cvtColor(cv_image, cv.CV_BGR2RGB)
-        cvIm = cv.CreateImageHeader((cv_image.shape[1], cv_image.shape[0]), cv.IPL_DEPTH_8U, 3)
-        cv.SetData(cvIm, cv_image.tostring(),
-               cv_image.dtype.itemsize * 3 * cv_image.shape[1])
-        CompositeShow("Image window", cam1, cvIm, settings)
+        #cvIm = cv.CreateImageHeader((cv_image.shape[1], cv_image.shape[0]), cv.IPL_DEPTH_8U, 3)
+        #cv.SetData(cvIm, cv_image.tostring(),
+        #       cv_image.dtype.itemsize * 3 * cv_image.shape[1])
+        #CompositeShow("Image window", cam1, cvIm, settings)
         #correct the frame
-        tosend = []
-        for mc in mcs:
-            new = cam1.FrameCorrect(mc[0],mc[1])
+        #tosend = []
+        #for mc in mcs:
+        #    new = cam1.FrameCorrect(mc[0],mc[1])
 
-            rectified = unit2world(new)
+        #    rectified = unit2world(new)
 
             #print "Ball: ", str(mc), " -> ", str(new)
-            #print "Ball: ", str(mc), " -> ", str(rectified)
-            tosend.append(rectified)
+        #    print "Ball: ", str(mc), " -> ", str(rectified)
+        #    tosend.append(rectified)
 
         #now send it!
-        tcpc.send(tosend)
+        #tcpc.send(tosend)
 
         cv.WaitKey(3)
 
@@ -499,8 +505,14 @@ setupGUI("", 218, 1000)
 if(NeedsToSave):
     Save("prefs.txt", cameras);
 
+start_time = current_milli_time()
+frames = 0
 while(True):
     image_call()
+    frames = frames + 1
+    diff = current_milli_time() - start_time
+    if diff > 0:
+       print "Frames Per Second: ", str(frames / (float(diff)/1000))
     if(NeedsToSave):
         Save("prefs.txt", cameras);
         NeedsToSave = False
