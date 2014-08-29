@@ -8,6 +8,7 @@ import sys
 import io
 import time
 import picamera
+import motioncontrol
 
 current_milli_time = lambda: round(time.time() * 1000)
 
@@ -472,6 +473,7 @@ def image_call():
         filtered = FindBall(cv_image)
 #        cv2.imshow(FilterWindowName, filtered)
         mcs = PickBlob(filtered)
+        motioncontrol.control(mc[0], mc[1])
         #for mc in mcs:
         #    cv2.circle(cv_image, (int(mc[0]), int(mc[1])), 3, cv.Scalar(255, 0, 0))
         #cv_image = cv2.cvtColor(cv_image, cv.CV_BGR2RGB)
@@ -507,6 +509,8 @@ if(NeedsToSave):
 
 start_time = current_milli_time()
 frames = 0
+
+motioncontrol.setup()
 while(True):
     image_call()
     frames = frames + 1
