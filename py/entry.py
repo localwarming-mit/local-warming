@@ -5,10 +5,11 @@ import numpy.linalg
 import math
 import socket
 import sys
+import os.path
 import io
 import time
-import picamera
-import motioncontrol
+#import picamera
+#import motioncontrol
 
 current_milli_time = lambda: round(time.time() * 1000)
 
@@ -34,7 +35,7 @@ class CalibrationMarker:
 calibCap = None
 def MouseCalibrate(image, markers):
     windowName = "Choose Point";
-#    cv.NamedWindow(windowName)
+    cv.NamedWindow(windowName)
     gotPoint = [False]*len(markers);
     ind = [0]
     pt = [0,0]
@@ -48,13 +49,13 @@ def MouseCalibrate(image, markers):
     cv.SetMouseCallback(windowName, mouseback);
     for i in range(0, len(markers)):
         #redisplay image and title
-#        cv.ShowImage(windowName, image);
+        cv.ShowImage(windowName, image);
         ind[0] = i
 
         #ask for pt
         while not gotPoint[ind[0]]:
             ret, calibImage = calibCap.retrieve()
-#            cv2.imshow(windowName, calibImage);
+            cv2.imshow(windowName, calibImage);
             cv.WaitKey(1);
 
         #add point to matrix
@@ -192,6 +193,9 @@ def PointInQuad(m,l):
     return False
 
 def Load(filename, cameras):
+    if(not os.path.isfile(filename)):
+        f = open(filename, "w")
+        f.close()
     f = open(filename, "r")
     for camera in cameras:
         camera.LdCounter = 0
@@ -337,9 +341,9 @@ def nothing(da):
 
 def setupGUI(tag, min_default=128, max_default=128):
     global FilterWindowName
-#    cv2.namedWindow(FilterWindowName+tag, 2)
-#    cv2.createTrackbar(tag+" Min", FilterWindowName+tag, min_default, 255, nothing)
-#    cv2.createTrackbar(tag+" Max", FilterWindowName+tag, max_default, 255, nothing)
+    cv2.namedWindow(FilterWindowName+tag, 2)
+    cv2.createTrackbar(tag+" Min", FilterWindowName+tag, min_default, 255, nothing)
+    cv2.createTrackbar(tag+" Max", FilterWindowName+tag, max_default, 255, nothing)
 
 
 def FindBall(im2):
@@ -355,7 +359,7 @@ def FindBall(im2):
     ret, hi2 = cv2.threshold(h, low_bnd, 255, cv2.THRESH_BINARY)
 
     hi = cv2.bitwise_and(hi1, hi2)
-#    cv2.imshow(FilterWindowName+"Hue", hi);
+    cv2.imshow(FilterWindowName+"Hue", hi);
     #---------------------
     high_bnd = cv2.getTrackbarPos("Value Max", FilterWindowName+"Value")
     low_bnd = cv2.getTrackbarPos("Value Min", FilterWindowName+"Value")
@@ -364,7 +368,7 @@ def FindBall(im2):
     ret, vi2 = cv2.threshold(v, low_bnd, 255, cv2.THRESH_BINARY)
 
     vi = cv2.bitwise_and(vi1, vi2)
-#    cv2.imshow(FilterWindowName+"Value", vi);
+    cv2.imshow(FilterWindowName+"Value", vi);
     #---------------------
     out = cv2.bitwise_and(vi, hi)
 
@@ -403,14 +407,15 @@ def PickBlob(im):
     return centroids
 
 
-#cap = cv2.VideoCapture(-1)
-#cap.set(cv.CV_CAP_PROP_FRAME_WIDTH , 320);
-#cap.set(cv.CV_CAP_PROP_FRAME_HEIGHT , 240);
-#cap.set(cv.CV_CAP_PROP_FPS, 20);
-#cap.set(cv.CV_CAP_PROP_FOURCC, cv.CV_FOURCC('R', 'G', 'B', '3'))
-#for i in range(0,20):
-#    ret, cv_image = cap.retrieve()
-#    cv.WaitKey(100)
+cap = cv2.VideoCapture(-1)
+cap.set(cv.CV_CAP_PROP_FRAME_WIDTH , 320);
+cap.set(cv.CV_CAP_PROP_FRAME_HEIGHT , 240);
+cap.set(cv.CV_CAP_PROP_FPS, 20);
+cap.set(cv.CV_CAP_PROP_FOURCC, cv.CV_FOURCC('R', 'G', 'B', '3'))
+
+for i in range(0,20):
+    ret, cv_image = cap.retrieve()
+    cv.WaitKey(100)
 
 class TCPClient:
     def __init__(self, Address, Port):
@@ -447,33 +452,37 @@ class TCPClient:
 
 #tcpc = TCPClient('localhost', 4558)
 
-class RaspiCap:
-    def __init__(self):
-        stream = self.stream = io.BytesIO()
-        camera = self.camera = picamera.PiCamera()
-	camera.resolution = (320, 240)
-	camera.framerate = 20
-        #camera.start_preview()
-        time.sleep(2)
-        camera.capture(stream, format='bmp')
-    def retrieve(self):
-        # Construct a numpy array from the stream
-        data = numpy.fromstring(self.stream.getvalue(), dtype=numpy.uint8)
-        # "Decode" the image from the array, preserving colour
-        image = cv2.imdecode(data, 1)
+#class RaspiCap:
+#    def __init__(self):
+#        stream = self.stream = io.BytesIO()
+#        camera = self.camera = picamera.PiCamera()
+#	camera.resolution = (320, 240)
+#	camera.framerate = 20
+#        #camera.start_preview()
+#        time.sleep(2)
+#        camera.capture(stream, format='bmp')
+#    def retrieve(self):
+#        # Construct a numpy array from the stream
+#        data = numpy.fromstring(self.stream.getvalue(), dtype=numpy.uint8)
+#        # "Decode" the image from the array, preserving colour
+#        image = cv2.imdecode(data, 1)
 	#image = None
-        return 1, image
+        #return 1, image
 
-cap = RaspiCap()
+#cap = RaspiCap()
 calibCap = cap
+
+fgbg = cv2.BackgroundSubtractorMOG()
+
 def image_call():
-    global FilterWindowName
-    ret, cv_image = cap.retrieve()
+    global FilterWindowName, aux_img
+    ret, cv_image = cap.read()
     if(ret):
-        filtered = FindBall(cv_image)
-#        cv2.imshow(FilterWindowName, filtered)
+        #filtered = FindBall(cv_image)
+        filtered = fgbg.apply(cv_image)
+        cv2.imshow(FilterWindowName, filtered)
         mcs = PickBlob(filtered)
-        motioncontrol.control(mc[0], mc[1])
+        #motioncontrol.control(mc[0], mc[1])
         #for mc in mcs:
         #    cv2.circle(cv_image, (int(mc[0]), int(mc[1])), 3, cv.Scalar(255, 0, 0))
         #cv_image = cv2.cvtColor(cv_image, cv.CV_BGR2RGB)
@@ -494,8 +503,9 @@ def image_call():
 
         #now send it!
         #tcpc.send(tosend)
-
-        cv.WaitKey(3)
+        if cv2.waitKey(3) & 0xFF == ord(' '):
+            #snap background
+            pass
 
 #set up with sane defaults
 setupGUI("Hue", 115, 128)
@@ -510,7 +520,7 @@ if(NeedsToSave):
 start_time = current_milli_time()
 frames = 0
 
-motioncontrol.setup()
+#motioncontrol.setup()
 while(True):
     image_call()
     frames = frames + 1
