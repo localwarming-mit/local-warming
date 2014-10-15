@@ -35,7 +35,7 @@ class CalibrationMarker:
 calibCap = None
 def MouseCalibrate(image, markers):
     windowName = "Choose Point";
-    cv.NamedWindow(windowName)
+    cv2.namedWindow(windowName)
     gotPoint = [False]*len(markers);
     ind = [0]
     pt = [0,0]
@@ -49,7 +49,7 @@ def MouseCalibrate(image, markers):
     cv.SetMouseCallback(windowName, mouseback);
     for i in range(0, len(markers)):
         #redisplay image and title
-        cv.ShowImage(windowName, image);
+        cv2.imshow(windowName, image);
         ind[0] = i
 
         #ask for pt
@@ -212,8 +212,8 @@ def Load(filename, cameras):
 
 def CompositeShow(windowName, camera, image, settings, pts=[]):
     global Uncalibrated
-#    cv.NamedWindow(windowName)
-    comp = cv.CloneImage(image)
+    cv2.namedWindow(windowName)
+    comp = image.copy() #cv.CloneImage(image)
     if(Uncalibrated):
         CalibrateCameras(comp)
         Uncalibrated = False
@@ -222,25 +222,25 @@ def CompositeShow(windowName, camera, image, settings, pts=[]):
         #draw lines
 
         #p1 - p2
-        cv.Line(comp, tuple(camera.calibrationmarkers[0].pos), \
+        cv2.line(comp, tuple(camera.calibrationmarkers[0].pos), \
                       tuple(camera.calibrationmarkers[1].pos), cv.Scalar(0, 255, 0), 1, cv.CV_AA)
 
         #p1 - p4
-        cv.Line(comp, tuple(camera.calibrationmarkers[0].pos), \
+        cv2.line(comp, tuple(camera.calibrationmarkers[0].pos), \
                       tuple(camera.calibrationmarkers[3].pos), cv.Scalar(0, 255, 0), 1, cv.CV_AA)
 
         #p3 - p4
-        cv.Line(comp, tuple(camera.calibrationmarkers[2].pos), \
+        cv2.line(comp, tuple(camera.calibrationmarkers[2].pos), \
                       tuple(camera.calibrationmarkers[3].pos), cv.Scalar(0, 255, 0), 1, cv.CV_AA)
 
         #p2 - p3
-        cv.Line(comp, tuple(camera.calibrationmarkers[1].pos), \
+        cv2.line(comp, tuple(camera.calibrationmarkers[1].pos), \
                       tuple(camera.calibrationmarkers[2].pos), cv.Scalar(0, 255, 0), 1, cv.CV_AA)
 
     for pt in pts:
-        cv.Circle(comp, (int(pt[0]), int(pt[1])), 3, cv.Scalar(255, 0, 0))
-#    cv.ShowImage(windowName, comp)
-
+        cv2.circle(comp, (int(pt[0]), int(pt[1])), 10, cv.Scalar(0, 0, 255), thickness=-1)
+    cv2.imshow(windowName, comp)
+    return cv2.resize(comp, (640, 480))
 
 cam1 = Camera(-1);
 cam2 = Camera("../cam2.mov");
@@ -376,25 +376,30 @@ def FindBall(im2):
     return out
 
 def ErodeTrick(im):
-    cv2.erode(im, im, None, 3)
-    cv2.dilate(im, im, None, 3)
+    kernel = numpy.ones((10,10),numpy.uint8)
+    im = cv2.erode(im, kernel, iterations=2)
+    im = cv2.dilate(im, kernel, iterations = 2)
 
-    cv2.dilate(im, im, None, 3)
-    cv2.erode(im, im, None, 3)
+    #kernel = numpy.ones((10,10),numpy.uint8)
+    #im = cv2.erode(im, kernel, iterations=2)
+    #im = cv2.dilate(im, kernel, iterations = 2)
+
+    #cv2.dilate(im, im, None, 3)
+    #cv2.erode(im, im, None, 3)
     return im
 
 cntrs = None
 hier = None
 def PickBlob(im):
     global cntrs, hier
-    [cntrs, hier] = cv2.findContours(im, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE, cntrs, hier)
-
+    [conts, hier] = cv2.findContours(im, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
     high_bnd = cv2.getTrackbarPos(" Max", FilterWindowName)
     low_bnd = cv2.getTrackbarPos(" Min", FilterWindowName)
     cntrs = []
-    for cntr in cntrs:
+    for cntr in conts:
         ara = cv2.contourArea(cntr)
-        if(low_band < ara < high_bnd):
+        if(3000 < ara):
+            print "ara: ", str(ara)
             cntrs.append(cntr)
 
     centroids = []
@@ -407,11 +412,15 @@ def PickBlob(im):
     return centroids
 
 
-cap = cv2.VideoCapture(-1)
+cap = cv2.VideoCapture("/home/nd/stabilized.avi")
+if not cap.isOpened():
+    print "AHH NOT OPEN"
+else:
+    print "OPEN!"
 cap.set(cv.CV_CAP_PROP_FRAME_WIDTH , 320);
 cap.set(cv.CV_CAP_PROP_FRAME_HEIGHT , 240);
-cap.set(cv.CV_CAP_PROP_FPS, 20);
-cap.set(cv.CV_CAP_PROP_FOURCC, cv.CV_FOURCC('R', 'G', 'B', '3'))
+#cap.set(cv.CV_CAP_PROP_FPS, 20);
+#cap.set(cv.CV_CAP_PROP_FOURCC, cv.CV_FOURCC('R', 'G', 'B', '3'))
 
 for i in range(0,20):
     ret, cv_image = cap.retrieve()
@@ -472,24 +481,31 @@ class TCPClient:
 #cap = RaspiCap()
 calibCap = cap
 
-fgbg = cv2.BackgroundSubtractorMOG()
+fgbg = cv2.BackgroundSubtractorMOG2(200, 30, True) #(10, 5, 0.001, 0.1)
 
+outf = cv2.VideoWriter("/home/nd/out.avi", cv2.cv.CV_FOURCC(*'XVID'), 20, (640, 480))
 def image_call():
     global FilterWindowName, aux_img
+    #ret, cv_image = cap.read()
     ret, cv_image = cap.read()
+    #cv2.imwrite("/home/nd/blah.jpg", cv_image)
     if(ret):
         #filtered = FindBall(cv_image)
         filtered = fgbg.apply(cv_image)
-        cv2.imshow(FilterWindowName, filtered)
-        mcs = PickBlob(filtered)
+        flt2 = ErodeTrick(filtered)
+        ret, flt2 = cv2.threshold(flt2, 225, 255, cv2.THRESH_BINARY)
+        cv2.imshow(FilterWindowName+" filtered", flt2)
+
+        mcs = PickBlob(flt2)
+        print "MCS SIZE: ", str(len(mcs))
         #motioncontrol.control(mc[0], mc[1])
-        #for mc in mcs:
-        #    cv2.circle(cv_image, (int(mc[0]), int(mc[1])), 3, cv.Scalar(255, 0, 0))
         #cv_image = cv2.cvtColor(cv_image, cv.CV_BGR2RGB)
         #cvIm = cv.CreateImageHeader((cv_image.shape[1], cv_image.shape[0]), cv.IPL_DEPTH_8U, 3)
         #cv.SetData(cvIm, cv_image.tostring(),
         #       cv_image.dtype.itemsize * 3 * cv_image.shape[1])
-        #CompositeShow("Image window", cam1, cvIm, settings)
+        save = CompositeShow("Image window", cam1, cv_image, settings, mcs)
+        print "SHAPE: ", str(save.shape)
+        outf.write(save)
         #correct the frame
         #tosend = []
         #for mc in mcs:
@@ -503,14 +519,18 @@ def image_call():
 
         #now send it!
         #tcpc.send(tosend)
-        if cv2.waitKey(3) & 0xFF == ord(' '):
-            #snap background
-            pass
+        #if cv2.waitKey(3) & 0xFF == ord(' '):
+        #    #snap background
+        #    print "BACKGROUND"
+        #    pass
+        cv2.waitKey(3)
+    else:
+        outf.release()
 
 #set up with sane defaults
-setupGUI("Hue", 115, 128)
+#setupGUI("Hue", 115, 128)
 #setupGUI("Hue")
-setupGUI("Value", 218, 255)
+#setupGUI("Value", 218, 255)
 # setupGUI("Value")
 setupGUI("", 218, 1000)
 
@@ -521,12 +541,19 @@ start_time = current_milli_time()
 frames = 0
 
 #motioncontrol.setup()
+
+target_fps = 15
+last_t = 0
 while(True):
     image_call()
     frames = frames + 1
     diff = current_milli_time() - start_time
     if diff > 0:
        print "Frames Per Second: ", str(frames / (float(diff)/1000))
+    cur_t = current_milli_time()
+    if(cur_t - last_t < 1000 / target_fps):
+        time.sleep((1000/target_fps - (cur_t-last_t))/1000)
+    last_t = cur_t
     if(NeedsToSave):
         Save("prefs.txt", cameras);
         NeedsToSave = False
