@@ -8,6 +8,7 @@ import sys
 import os.path
 import io
 import time
+import HumanTracker
 #import picamera
 #import motioncontrol
 
@@ -399,7 +400,7 @@ def PickBlob(im):
     for cntr in conts:
         ara = cv2.contourArea(cntr)
         if(3000 < ara):
-            print "ara: ", str(ara)
+            #print "ara: ", str(ara)
             cntrs.append(cntr)
 
     centroids = []
@@ -484,6 +485,8 @@ calibCap = cap
 fgbg = cv2.BackgroundSubtractorMOG2(200, 30, True) #(10, 5, 0.001, 0.1)
 
 outf = cv2.VideoWriter("/home/nd/out.avi", cv2.cv.CV_FOURCC(*'XVID'), 20, (640, 480))
+
+ht = HumanTracker.HumanTracker()
 def image_call():
     global FilterWindowName, aux_img
     #ret, cv_image = cap.read()
@@ -497,14 +500,17 @@ def image_call():
         cv2.imshow(FilterWindowName+" filtered", flt2)
 
         mcs = PickBlob(flt2)
-        print "MCS SIZE: ", str(len(mcs))
+        #print "MCS SIZE: ", str(len(mcs))
+        ht.update(mcs)
+        #cv_image = ht.drawFirstEight(cv_image)
+        mcs  = ht.getConfidentPts()
         #motioncontrol.control(mc[0], mc[1])
         #cv_image = cv2.cvtColor(cv_image, cv.CV_BGR2RGB)
         #cvIm = cv.CreateImageHeader((cv_image.shape[1], cv_image.shape[0]), cv.IPL_DEPTH_8U, 3)
         #cv.SetData(cvIm, cv_image.tostring(),
         #       cv_image.dtype.itemsize * 3 * cv_image.shape[1])
         save = CompositeShow("Image window", cam1, cv_image, settings, mcs)
-        print "SHAPE: ", str(save.shape)
+        #print "SHAPE: ", str(save.shape)
         outf.write(save)
         #correct the frame
         #tosend = []
