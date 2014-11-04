@@ -40,6 +40,17 @@ class PtKalman:
     def __init__(self, pt):
         self.pt = pt
         self.kalman = cv2.KalmanFilter()
+        self.history = []
+    def getHistory(self):
+        return self.history
+    def assignObs(self, pt):
+        #update the kalman
+        self.kalman.correct(pt)
+        self.history.append(pt)
+    def drawOnImage(self, im, color):
+        pass
+        # go through history and make a line
+
 
 class HumanTracker:
     def __init__(self):
@@ -68,7 +79,7 @@ class HumanTracker:
         #ask filters to update themselves on the new pts
         filtUpdates()
         #update history
-        self.append(mcs)
+        self.history.append(mcs)
 
     def addTrack(self, filte, track):
         #add to filters
