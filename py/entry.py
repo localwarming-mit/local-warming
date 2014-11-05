@@ -1,8 +1,7 @@
 import cv2
 import time
 
-from camera import Camera
-from calibration import NeedsToSave, cam1
+from camera import Camera, NeedsToSave, cam1
 from HumanTracker import HumanTracker
 from markers import CalibrationMarker
 from utils import PointInQuad, setupGUI, ErodeTrick

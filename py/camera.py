@@ -1,4 +1,6 @@
 from markers import CalibrationMarker
+from calibration import MouseCalibrate, AutoCalibrate
+import os
 import cv
 import numpy
 
@@ -113,3 +115,54 @@ class Camera:
         #compute l
         l = (x-a[0,0]-a[0,2]*m)/(a[0,1]+a[0,3]*m)
         return l,m
+
+
+def Save(filename, cameras):
+    f = open(filename, "w")
+    for camera in cameras:
+        camera.Save(f)
+
+
+def Load(filename, cameras):
+    if(not os.path.isfile(filename)):
+        f = open(filename, "w")
+        f.close()
+    f = open(filename, "r")
+    for camera in cameras:
+        camera.LdCounter = 0
+    line = f.readline()
+    while(len(line) != 0):
+        #test line on all cameras
+        for camera in cameras:
+            camera.Load(line)
+        line = f.readline()
+
+
+cam1 = Camera(-1);
+cam2 = Camera("../cam2.mov");
+cam3 = Camera("../cam3.mov");
+cam4 = Camera("../cam4.mov");
+
+cameras = [cam1]#,cam2,cam3,cam4]
+
+im1 = cam1.next()
+#cv.SaveImage("test.jpg", im1)
+#im2 = cam2.next()
+#im3 = cam3.next()
+#im4 = cam4.next()
+
+Load("prefs.txt", cameras);
+ManualCalibrate = True;
+#print "calibs: " + str([x.calibrated for x in cameras])
+NeedsToSave = False
+Uncalibrated = not reduce(lambda a,b: a and b, [x.calibrated for x in cameras])
+
+if(not Uncalibrated):
+   [cam.CalibrateFunc() for cam in cameras]
+def CalibrateCameras(imageOverRide = None):
+    global NeedsToSave, cameras, Uncalibrated
+    if(Uncalibrated):
+        #recalibrate
+        NeedsToSave = True
+        Uncalibrated = True
+        [cam.Calibrate(ManualCalibrate, imageOverRide) for cam in cameras]

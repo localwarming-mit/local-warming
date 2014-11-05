@@ -1,7 +1,7 @@
 import cv
 import cv2
 import GlobalSettings
-from calibration import Uncalibrated
+from camera import Uncalibrated
 
 def CompositeShow(windowName, camera, image, pts=[]):
     global Uncalibrated
