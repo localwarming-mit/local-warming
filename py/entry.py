@@ -8,343 +8,25 @@ import sys
 import os.path
 import io
 import time
-import HumanTracker
+
+from camera import Camera
+from calibration import NeedsToSave, cam1
+from HumanTracker import HumanTracker
+from markers import CalibrationMarker
+from utils import PointInQuad, setupGUI
+import GlobalSettings
+from GlobalSettings import FilterWindowName
+from viz import CompositeShow
 #import picamera
 #import motioncontrol
 
 current_milli_time = lambda: round(time.time() * 1000)
 
-class CalibrationMarker:
-    def __init__(self, UID):
-        self.UID = UID
-        self.mon = "CALIB"+str(UID)
-        self.pos = [0, 0]
 
-    def Save(self, f, prefix):
-        stng = prefix+self.mon+"="+str(self.pos)+"\n"
-        f.write(stng)
 
-    def Load(self, line, prefix):
-        stng = prefix+self.mon
-        if(line.startswith(stng)):
-            self.pos = eval(line[line.rfind("=")+1:])
-            #print "got: "+ line + " ---> " + str(self.pos)
-            return True
-        return False
 
 
-calibCap = None
-def MouseCalibrate(image, markers):
-    windowName = "Choose Point";
-    cv2.namedWindow(windowName)
-    gotPoint = [False]*len(markers);
-    ind = [0]
-    pt = [0,0]
-    def mouseback(event,x,y,flags,param):
-        if event==cv.CV_EVENT_LBUTTONUP:		# here event is left mouse button double-clicked
-            print x,y
-            pt[0] = x
-            pt[1] = y
-            gotPoint[ind[0]] = True
 
-    cv.SetMouseCallback(windowName, mouseback);
-    for i in range(0, len(markers)):
-        #redisplay image and title
-        cv2.imshow(windowName, image);
-        ind[0] = i
-
-        #ask for pt
-        while not gotPoint[ind[0]]:
-            ret, calibImage = calibCap.retrieve()
-            cv2.imshow(windowName, calibImage);
-            cv.WaitKey(1);
-
-        #add point to matrix
-        markers[i].pos = [pt[0], pt[1]];
-
-    cv.DestroyWindow(windowName)
-
-def AutoCalibrate(image):
-    pass
-
-def Save(filename, cameras):
-    f = open(filename, "w")
-    for camera in cameras:
-        camera.Save(f)
-
-
-class Camera:
-    pos = [0,0,0];
-    cur = None
-    def __init__(self, id):
-        self.red = CalibrationMarker("RED");
-        self.blue = CalibrationMarker("BLUE");
-        self.green = CalibrationMarker("GREEN");
-        self.yellow = CalibrationMarker("YELLOW");
-
-        self.calibrationmarkers = [self.red, self.blue, self.green, self.yellow]
-
-        if(type(id) == type('imastring')):
-            self.capture = cv.CaptureFromFile(id);
-            id = int(id[-5])
-        else: #i'm a numeric id
-            self.capture = cv.CaptureFromFile("../cam1.mov")
-            #self.capture = cv2.VideoCapture(id);
-
-        self.calibrated = False
-        self.id = id;
-
-    def next(self):
-        #self.cur = self.capture.retrieve()
-        self.cur = None
-        return self.cur;
-    def Save(self, f, prefix=""):
-        for calib in self.calibrationmarkers:
-            calib.Save(f, "CAM"+str(self.id))
-
-    def Load(self, line, prefix=""):
-        iscalib = [calib.Load(line, "CAM"+str(self.id)) for calib in self.calibrationmarkers]
-        self.LdCounter += iscalib.count(True)
-        self.calibrated = self.calibrated or self.LdCounter == len(self.calibrationmarkers)
-
-    def Calibrate(self, withMouse, imageOverride = None):
-        if(imageOverride == None):
-            imageOverride = self.cur
-        if(withMouse):
-            MouseCalibrate(imageOverride, self.calibrationmarkers);
-        else:
-            AutoCalibrate(imageOverride, self.calibrationmarkers);
-        self.CalibrateFunc()
-        self.calibrated = True
-
-    def CalibrateFunc(self):
-        #for each calibration marker, construct matrix to do least squares with
-        numrows = 2*len(self.calibrationmarkers)
-        A = numpy.zeros((numrows, 9))
-        B = numpy.zeros((numrows, 1))
-        # marker 1: 0,0
-        # marker 2: 1,0
-        # marker 3: 1,1
-        # marker 4: 0,1
-        #B(0),B(1) = 0   #marker 1
-        B[2] = 1; B[5]=1 #marker 2,3
-        B[4] = 1;
-        B[6] = 0; B[7]=1
-        #B[3] = 1; B[4]=1 #marker 2,3
-        #B[6] = 1; B[7]=1 #marker 4
-
-
-        #create our polygon
-        self.px = numpy.array([-1, 8, 13, -4])
-        self.py = numpy.array([-1, 3, 11, 8])
-        i = 0
-        for calib in self.calibrationmarkers:
-            self.px[(3+i)%4] = calib.pos[0]
-            self.py[(3+i)%4] = -calib.pos[1]
-            i = i + 1
-
-
-        print "PX: \n", str(self.px)
-        print "PY: \n", str(self.py)
-        #compute coefficients
-
-        #A=numpy.mat('1 0 0 0;1 1 0 0;1 1 1 1;1 0 1 0')
-        #print "A: \n", str(A)
-        #AI = numpy.invert(A)
-        AI = numpy.mat('1 0 0 0;-1 1 0 0;-1 0 0 1;1 -1 1 -1')
-
-        #print "AI: \n", str(AI)
-        #print "shapes: ", str(AI.shape), " and ", str(self.px.T.shape)
-        self.a = numpy.dot(AI, self.px)
-        self.a = numpy.squeeze(self.a)
-        print "a: \n", str(self.a)
-        self.b = numpy.dot(AI, self.py)
-        self.b = numpy.squeeze(self.b)
-        print "b: \n", str(self.b)
-
-        #classify points as internal or external
-        #plot_internal_and_external_points(px,py,a,b);
-
-        return self.a, self.b
-
-    # converts physical (x,y) to logical (l,m)
-    def FrameCorrect(self, x, y):
-        #quadratic equation coeffs, aa*mm^2+bb*m+cc=0
-        #y = 240 - y
-        y = -y
-        a = self.a
-        b = self.b
-        aa = a[0,3]*b[0,2] - a[0,2]*b[0,3]
-        bb = a[0,3]*b[0,0] -a[0,0]*b[0,3] + a[0,1]*b[0,2] - a[0,2]*b[0,1] + x*b[0,3] - y*a[0,3]
-        cc = a[0,1]*b[0,0] -a[0,0]*b[0,1] + x*b[0,1] - y*a[0,1]
-        #compute m = (-b+sqrt(b^2-4ac))/(2a)
-        det = math.sqrt(bb*bb - 4*aa*cc);
-        m = (-bb+det)/(2*aa);
-
-        #compute l
-        l = (x-a[0,0]-a[0,2]*m)/(a[0,1]+a[0,3]*m)
-        return l,m
-
-
-#point in quad
-def PointInQuad(m,l):
-    #is the point outside the quad?
-    if (m<0 or m>1 or l<0 or l>1):
-        return True
-    return False
-
-def Load(filename, cameras):
-    if(not os.path.isfile(filename)):
-        f = open(filename, "w")
-        f.close()
-    f = open(filename, "r")
-    for camera in cameras:
-        camera.LdCounter = 0
-    line = f.readline()
-    while(len(line) != 0):
-        #test line on all cameras
-        for camera in cameras:
-            camera.Load(line)
-        line = f.readline()
-
-
-
-
-
-def CompositeShow(windowName, camera, image, settings, pts=[]):
-    global Uncalibrated
-    cv2.namedWindow(windowName)
-    comp = image.copy() #cv.CloneImage(image)
-    if(Uncalibrated):
-        CalibrateCameras(comp)
-        Uncalibrated = False
-
-    if(settings.showGrid):
-        #draw lines
-
-        #p1 - p2
-        cv2.line(comp, tuple(camera.calibrationmarkers[0].pos), \
-                      tuple(camera.calibrationmarkers[1].pos), cv.Scalar(0, 255, 0), 1, cv.CV_AA)
-
-        #p1 - p4
-        cv2.line(comp, tuple(camera.calibrationmarkers[0].pos), \
-                      tuple(camera.calibrationmarkers[3].pos), cv.Scalar(0, 255, 0), 1, cv.CV_AA)
-
-        #p3 - p4
-        cv2.line(comp, tuple(camera.calibrationmarkers[2].pos), \
-                      tuple(camera.calibrationmarkers[3].pos), cv.Scalar(0, 255, 0), 1, cv.CV_AA)
-
-        #p2 - p3
-        cv2.line(comp, tuple(camera.calibrationmarkers[1].pos), \
-                      tuple(camera.calibrationmarkers[2].pos), cv.Scalar(0, 255, 0), 1, cv.CV_AA)
-
-    for pt in pts:
-        cv2.circle(comp, (int(pt[0]), int(pt[1])), 10, cv.Scalar(0, 0, 255), thickness=-1)
-    cv2.imshow(windowName, comp)
-    return cv2.resize(comp, (640, 480))
-
-cam1 = Camera(-1);
-cam2 = Camera("../cam2.mov");
-cam3 = Camera("../cam3.mov");
-cam4 = Camera("../cam4.mov");
-
-cameras = [cam1]#,cam2,cam3,cam4]
-
-im1 = cam1.next()
-#cv.SaveImage("test.jpg", im1)
-#im2 = cam2.next()
-#im3 = cam3.next()
-#im4 = cam4.next()
-
-Load("prefs.txt", cameras);
-ManualCalibrate = True;
-#print "calibs: " + str([x.calibrated for x in cameras])
-NeedsToSave = False
-Uncalibrated = not reduce(lambda a,b: a and b, [x.calibrated for x in cameras])
-
-if(not Uncalibrated):
-   [cam.CalibrateFunc() for cam in cameras]
-def CalibrateCameras(imageOverRide = None):
-    global NeedsToSave, cameras, Uncalibrated
-    if(Uncalibrated):
-        #recalibrate
-        NeedsToSave = True
-        Uncalibrated = True
-        [cam.Calibrate(ManualCalibrate, imageOverRide) for cam in cameras]
-
-
-g_a = None
-g_b = None
-
-#Calibrate unit->world
-
-#lightblue/pink/green/darkblue
-g_px = numpy.array([0.4, 2.3, 4.2, 2.3])
-g_py = numpy.array([2.44, 0.4, 2.44, 4.48])
-#g_px = numpy.array([2.3,  0.4,  2.3, 4.2])
-#g_py = numpy.array([4.48, 2.44, 0.4, 2.44])
-
-#compute coefficients
-AI = numpy.mat('1 0 0 0;-1 1 0 0;-1 0 0 1;1 -1 1 -1')
-
-
-g_a = numpy.dot(AI, g_px)
-g_a = numpy.squeeze(g_a)
-#print "g_a: \n", str(g_a)
-g_b = numpy.dot(AI, g_py)
-g_b = numpy.squeeze(g_b)
-#print "g_b: \n", str(g_b)
-
-
-def unit2world(pos):
-    g = pos[0]
-    h = pos[1]
-    k = g*h
-    unit = numpy.bmat([[[1], [g], [h], [k]]])
-    world_x = numpy.asscalar(numpy.dot(g_a, unit.T))
-    world_y = numpy.asscalar(numpy.dot(g_b, unit.T))
-    return (world_x, world_y)
-
-#test
-#print "unit2world 0,0: \n", str(unit2world([0,0]))
-#print "unit2world 1,0: \n", str(unit2world([1,0]))
-#print "unit2world 0 1: \n", str(unit2world([0,1]))
-#print "unit2world 1 1: \n", str(unit2world([1,1]))
-# 4 different colors, find those, autocalibrate
-
-
-# -> calib per camera
-class Settings:
-    def __init__(self):
-        self.showGrid = True
-
-settings = Settings()
-
-
-#Test 1
-##CompositeShow("Camera 1", cam1, settings)
-##def mouseback_rect(event,x,y,flags,param):
-##    if event==cv.CV_EVENT_LBUTTONUP:		# here event is left mouse button double-clicked
-##        new = cam1.FrameCorrect(x,y)
-##        print x,y, "->", new
-##
-##
-##
-##cv.SetMouseCallback("Camera 1", mouseback_rect);
-##cv.WaitKey()
-
-#cv.NamedWindow("Image window", 1)
-
-
-FilterWindowName = "Filter Window "
-def nothing(da):
-    pass
-
-def setupGUI(tag, min_default=128, max_default=128):
-    global FilterWindowName
-    cv2.namedWindow(FilterWindowName+tag, 2)
-    cv2.createTrackbar(tag+" Min", FilterWindowName+tag, min_default, 255, nothing)
-    cv2.createTrackbar(tag+" Max", FilterWindowName+tag, max_default, 255, nothing)
 
 
 def FindBall(im2):
@@ -413,7 +95,7 @@ def PickBlob(im):
     return centroids
 
 
-cap = cv2.VideoCapture("/home/nd/stabilized.avi")
+cap = cv2.VideoCapture("/home/nd/Downloads/out.avi")
 if not cap.isOpened():
     print "AHH NOT OPEN"
 else:
@@ -486,7 +168,7 @@ fgbg = cv2.BackgroundSubtractorMOG2(200, 30, True) #(10, 5, 0.001, 0.1)
 
 outf = cv2.VideoWriter("/home/nd/out.avi", cv2.cv.CV_FOURCC(*'XVID'), 20, (640, 480))
 
-ht = HumanTracker.HumanTracker()
+ht = HumanTracker()
 def image_call():
     global FilterWindowName, aux_img
     #ret, cv_image = cap.read()
@@ -509,7 +191,7 @@ def image_call():
         #cvIm = cv.CreateImageHeader((cv_image.shape[1], cv_image.shape[0]), cv.IPL_DEPTH_8U, 3)
         #cv.SetData(cvIm, cv_image.tostring(),
         #       cv_image.dtype.itemsize * 3 * cv_image.shape[1])
-        save = CompositeShow("Image window", cam1, cv_image, settings, mcs)
+        save = CompositeShow("Image window", cam1, cv_image, mcs)
         #print "SHAPE: ", str(save.shape)
         outf.write(save)
         #correct the frame
@@ -564,24 +246,3 @@ while(True):
         Save("prefs.txt", cameras);
         NeedsToSave = False
 cv.DestroyAllWindows()
-
-
-
-
-#play all until one dies
-#while(im1 != None and im2 != None and
-#      im3 != None and im4 != None):
-    # color thresh video
-    # -overlay transparent
-
-    # + mask
-    # +erode, dilate, flip
-
-    # + overlay tracking transparent
-
-
-# + all of these filters as GUI
-# + all of these layers as GUI
-# + affine - two cameras
-
-# fake distances to get cm accuracy
