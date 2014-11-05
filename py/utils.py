@@ -1,6 +1,6 @@
 import cv2
 import numpy
-from GlobalSettings import FilterWindowName
+from GlobalSettings import FilterWindowName, imdebug
 
 #point in quad
 def PointInQuad(m,l):
@@ -26,11 +26,17 @@ def PointInQuad(m,l):
 def nothing(da):
     pass
 
+tracks = {}
+
 def setupGUI(tag, min_default=128, max_default=128):
     global FilterWindowName
-    cv2.namedWindow(FilterWindowName+tag, 2)
-    cv2.createTrackbar(tag+" Min", FilterWindowName+tag, min_default, 255, nothing)
-    cv2.createTrackbar(tag+" Max", FilterWindowName+tag, max_default, 255, nothing)
+    if imdebug:
+        cv2.namedWindow(FilterWindowName+tag, 2)
+        cv2.createTrackbar(tag+" Min", FilterWindowName+tag, min_default, 255, nothing)
+        cv2.createTrackbar(tag+" Max", FilterWindowName+tag, max_default, 255, nothing)
+    else:
+        tracks[tag+" Min"] = min_default
+        tracks[tag+" Max"] = max_default
 
 
 def ErodeTrick(im):
@@ -45,3 +51,13 @@ def ErodeTrick(im):
     #cv2.dilate(im, im, None, 3)
     #cv2.erode(im, im, None, 3)
     return im
+
+
+def getTrack(name, window):
+    if imdebug:
+        high_bnd = cv2.getTrackbarPos(name, window)
+        low_bnd = cv2.getTrackbarPos(name, window)
+    else:
+        high_bnd = tracks[name+" Max"]
+        low_bnd = tracks[name+" Min"]
+    return high_bnd, low_bnd

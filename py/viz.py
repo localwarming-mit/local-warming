@@ -5,6 +5,10 @@ from calibration import Uncalibrated
 
 def CompositeShow(windowName, camera, image, pts=[]):
     global Uncalibrated
+
+    if not GlobalSettings.imdebug:
+        return image
+
     cv2.namedWindow(windowName)
     comp = image.copy() #cv.CloneImage(image)
     if(Uncalibrated):

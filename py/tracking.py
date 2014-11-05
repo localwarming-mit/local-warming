@@ -1,30 +1,31 @@
 import cv2
-from GlobalSettings import FilterWindowName
-
+from GlobalSettings import FilterWindowName, imdebug
+from utils import getTrack
 
 def FindBall(im2):
-    global FilterWindowName
+    global FilterWindowName, imdebug
     hsv = cv2.cvtColor(im2, cv.CV_RGB2HSV)
     [h, s, v] = cv2.split(hsv)
 
     #---------------------
-    high_bnd = cv2.getTrackbarPos("Hue Max", FilterWindowName+"Hue")
-    low_bnd = cv2.getTrackbarPos("Hue Min", FilterWindowName+"Hue")
+    high_bnd, low_bnd = getTrack("Hue", FilterWindowName+"Hue")
 
     ret, hi1 = cv2.threshold(h, high_bnd, 255, cv2.THRESH_BINARY_INV)
     ret, hi2 = cv2.threshold(h, low_bnd, 255, cv2.THRESH_BINARY)
 
     hi = cv2.bitwise_and(hi1, hi2)
-    cv2.imshow(FilterWindowName+"Hue", hi);
+    if imdebug:
+        cv2.imshow(FilterWindowName+"Hue", hi);
     #---------------------
-    high_bnd = cv2.getTrackbarPos("Value Max", FilterWindowName+"Value")
-    low_bnd = cv2.getTrackbarPos("Value Min", FilterWindowName+"Value")
+    high_bnd, low_bnd = getTrack("Value", FilterWindowName+"Value")
 
     ret, vi1 = cv2.threshold(v, high_bnd, 255, cv2.THRESH_BINARY_INV)
     ret, vi2 = cv2.threshold(v, low_bnd, 255, cv2.THRESH_BINARY)
 
     vi = cv2.bitwise_and(vi1, vi2)
-    cv2.imshow(FilterWindowName+"Value", vi);
+
+    if imdebug:
+        cv2.imshow(FilterWindowName+"Value", vi);
     #---------------------
     out = cv2.bitwise_and(vi, hi)
 
@@ -36,8 +37,8 @@ hier = None
 def PickBlob(im):
     global cntrs, hier
     [conts, hier] = cv2.findContours(im, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
-    high_bnd = cv2.getTrackbarPos(" Max", FilterWindowName)
-    low_bnd = cv2.getTrackbarPos(" Min", FilterWindowName)
+
+    high_bnd, low_bnd = getTrack("", FilterWindowName)
     cntrs = []
     for cntr in conts:
         ara = cv2.contourArea(cntr)

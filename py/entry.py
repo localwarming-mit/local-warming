@@ -33,7 +33,9 @@ def image_call():
         filtered = fgbg.apply(cv_image)
         flt2 = ErodeTrick(filtered)
         ret, flt2 = cv2.threshold(flt2, 225, 255, cv2.THRESH_BINARY)
-        cv2.imshow(FilterWindowName+" filtered", flt2)
+
+        if GlobalSettings.imdebug:
+            cv2.imshow(FilterWindowName+" filtered", flt2)
 
         mcs = PickBlob(flt2)
         #print "MCS SIZE: ", str(len(mcs))
@@ -45,9 +47,10 @@ def image_call():
         #cvIm = cv.CreateImageHeader((cv_image.shape[1], cv_image.shape[0]), cv.IPL_DEPTH_8U, 3)
         #cv.SetData(cvIm, cv_image.tostring(),
         #       cv_image.dtype.itemsize * 3 * cv_image.shape[1])
-        save = CompositeShow("Image window", cam1, cv_image, mcs)
-        #print "SHAPE: ", str(save.shape)
-        outf.write(save)
+        if GlobalSettings.imdebug:
+            save = CompositeShow("Image window", cam1, cv_image, mcs)
+            #print "SHAPE: ", str(save.shape)
+            outf.write(save)
         #correct the frame
         #tosend = []
         #for mc in mcs:
