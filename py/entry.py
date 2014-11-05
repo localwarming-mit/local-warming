@@ -55,8 +55,9 @@ methodChoice = "bgsub"
 
 curMethod = methods[methodChoice]
 
-
-outf = cv2.VideoWriter("/home/nd/out.avi", cv2.cv.CV_FOURCC(*'XVID'), 20, (640, 480))
+ShouldWriteOutput = False
+if ShouldWriteOutput:
+    outf = cv2.VideoWriter("/home/nd/out.avi", cv2.cv.CV_FOURCC(*'XVID'), 20, (640, 480))
 
 ht = HumanTracker()
 def image_call():
@@ -67,7 +68,8 @@ def image_call():
         if GlobalSettings.imdebug:
             save = CompositeShow("Image window", cam1, cv_image, mcs)
             #print "SHAPE: ", str(save.shape)
-            outf.write(save)
+            if ShouldWriteOutput:
+                outf.write(save)
 
         #motioncontrol.control(mc[0], mc[1])
 
@@ -89,7 +91,7 @@ def image_call():
         #    print "BACKGROUND"
         #    pass
         cv2.waitKey(3)
-    else:
+    elif ShouldWriteOutput:
         outf.release()
 
 #set up with sane defaults

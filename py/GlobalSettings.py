@@ -1,5 +1,5 @@
 imdebug=True
-capvideo=False
+capvideo=True
 cappi=False
 showGrid = True
 
