@@ -20,37 +20,57 @@ cap = GetCaptureDevice()
 calibCap = cap
 fgbg = cv2.BackgroundSubtractorMOG2(200, 30, True) #(10, 5, 0.001, 0.1)
 
+def Ball(cv_image):
+    filtered = FindBall(cv_image)
+    flt2 = ErodeTrick(filtered)
+    ret, flt2 = cv2.threshold(flt2, 225, 255, cv2.THRESH_BINARY)
+
+    if GlobalSettings.imdebug:
+        cv2.imshow(FilterWindowName+" filtered", flt2)
+
+    mcs = PickBlob(flt2)
+    #im = cv2.cvtColor(im, cv.CV_BGR2RGB)
+    return mcs
+
+def BgSub(cv_image):
+    filtered = fgbg.apply(cv_image)
+    flt2 = ErodeTrick(filtered)
+    ret, flt2 = cv2.threshold(flt2, 225, 255, cv2.THRESH_BINARY)
+    if GlobalSettings.imdebug:
+        cv2.imshow(FilterWindowName+" filtered", flt2)
+
+    mcs = PickBlob(flt2)
+    #print "MCS SIZE: ", str(len(mcs))
+    ht.update(mcs)
+    #cv_image = ht.drawFirstEight(cv_image)
+    mcs  = ht.getConfidentPts()
+    return mcs
+
+methods = {
+    "bgsub": BgSub,
+    "balltrack": Ball
+}
+
+methodChoice = "bgsub"
+
+curMethod = methods[methodChoice]
+
+
 outf = cv2.VideoWriter("/home/nd/out.avi", cv2.cv.CV_FOURCC(*'XVID'), 20, (640, 480))
 
 ht = HumanTracker()
 def image_call():
-    global FilterWindowName, aux_img
-    #ret, cv_image = cap.read()
+    global FilterWindowName, curMethod
     ret, cv_image = cap.read()
-    #cv2.imwrite("/home/nd/blah.jpg", cv_image)
     if(ret):
-        #filtered = FindBall(cv_image)
-        filtered = fgbg.apply(cv_image)
-        flt2 = ErodeTrick(filtered)
-        ret, flt2 = cv2.threshold(flt2, 225, 255, cv2.THRESH_BINARY)
-
-        if GlobalSettings.imdebug:
-            cv2.imshow(FilterWindowName+" filtered", flt2)
-
-        mcs = PickBlob(flt2)
-        #print "MCS SIZE: ", str(len(mcs))
-        ht.update(mcs)
-        #cv_image = ht.drawFirstEight(cv_image)
-        mcs  = ht.getConfidentPts()
-        #motioncontrol.control(mc[0], mc[1])
-        #cv_image = cv2.cvtColor(cv_image, cv.CV_BGR2RGB)
-        #cvIm = cv.CreateImageHeader((cv_image.shape[1], cv_image.shape[0]), cv.IPL_DEPTH_8U, 3)
-        #cv.SetData(cvIm, cv_image.tostring(),
-        #       cv_image.dtype.itemsize * 3 * cv_image.shape[1])
+        mcs = curMethod(cv_image)
         if GlobalSettings.imdebug:
             save = CompositeShow("Image window", cam1, cv_image, mcs)
             #print "SHAPE: ", str(save.shape)
             outf.write(save)
+
+        #motioncontrol.control(mc[0], mc[1])
+
         #correct the frame
         #tosend = []
         #for mc in mcs:
@@ -73,10 +93,8 @@ def image_call():
         outf.release()
 
 #set up with sane defaults
-#setupGUI("Hue", 115, 128)
-#setupGUI("Hue")
-#setupGUI("Value", 218, 255)
-# setupGUI("Value")
+setupGUI("Hue", 115, 128)
+setupGUI("Value", 218, 255)
 setupGUI("", 218, 1000)
 
 if(NeedsToSave):

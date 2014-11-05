@@ -1,3 +1,4 @@
+import cv
 import cv2
 from GlobalSettings import FilterWindowName, imdebug
 from utils import getTrack
