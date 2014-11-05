@@ -1,4 +1,5 @@
 import cv2
+import numpy
 from GlobalSettings import FilterWindowName
 
 #point in quad
