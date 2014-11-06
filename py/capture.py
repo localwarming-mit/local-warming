@@ -5,7 +5,7 @@ import cv
 if GlobalSettings.capvideo:
     cap = cv2.VideoCapture(-1)
 else:
-    cap = cv2.VideoCapture("/home/nd/Downloads/out.avi")
+    cap = cv2.VideoCapture("/home/nd/Downloads/out2.avi")
 
 if not cap.isOpened():
     print "AHH NOT OPEN"

@@ -1,4 +1,4 @@
-import cv2
+import cv2, cv
 import time
 
 from camera import Camera, NeedsToSave, cam1
@@ -10,6 +10,9 @@ from GlobalSettings import FilterWindowName
 from viz import CompositeShow
 from tracking import PickBlob, FindBall
 from capture import GetCaptureDevice
+
+from scipy.signal import convolve2d
+import numpy
 #import motioncontrol
 
 current_milli_time = lambda: round(time.time() * 1000)
@@ -45,12 +48,69 @@ def BgSub(cv_image):
     mcs  = ht.getConfidentPts()
     return mcs
 
+def variance(im, mean):
+    windowSize = 5
+    begin = windowSize /2
+    output = mean.copy()
+    for r in range(2, im.shape[0]-2):
+        for c in range(2, im.shape[1] - 2):
+            var = 0.0
+            # at pixel r, c - look in window size
+            for i in range(-begin, begin+1):
+                for j in range(-begin, begin+1):
+                    tmp =  float(im[r+i, c+j]) - float(mean[r+i, c+j])
+                    var = var + tmp*tmp
+            var = var / float(windowSize*windowSize)
+            output[r,c] = int(var)
+    print "Min: ", output.min(), " and max: ", output.max()
+
+    return output
+
+def variance2(im, mean):
+    imf = im.astype(numpy.float32)
+
+    meanf = mean.astype(numpy.float32)
+
+    imfsq = imf*imf
+
+    meanfsq = meanf*meanf
+
+    kernel = numpy.ones((5,5))
+
+    imsqadd = convolve2d(imfsq, kernel, 'same')
+    imadd = convolve2d(imf, kernel, 'same')
+
+    out = imsqadd-2*meanf*imadd+25.0*meanfsq
+    out = out / 25.0
+    out = out.astype(numpy.int8)
+    print "Min: ", out.min(), " and max: ", out.max()
+    return out
+
+
+def Motion(cv_image):
+    #turn in to hsv
+    #hsv = cv2.cvtColor(cv_image, cv.CV_RGB2HSV)
+    #[h, s, v] = cv2.split(hsv)
+
+    hsv = cv2.cvtColor(cv_image, cv.CV_RGB2GRAY)
+    grey = cv2.boxFilter(hsv, -1, (5, 5))
+    gg = variance2(hsv, grey)
+    cv2.imshow("gry", gg)
+    #cv2.imshow("hue", h)
+    #cv2.imshow("sat", s)
+    #cv2.imshow("val", v)
+    #find most stable image
+    #look at frame differences
+    #calculate entropy image
+    return []
+
 methods = {
     "bgsub": BgSub,
-    "balltrack": Ball
+    "balltrack": Ball,
+    "motion": Motion
 }
 
-methodChoice = "bgsub"
+methodChoice = "motion"
 
 curMethod = methods[methodChoice]
 

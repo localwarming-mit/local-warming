@@ -1,5 +1,5 @@
 imdebug=True
-capvideo=True
+capvideo=False
 cappi=False
 showGrid = True
 
@@ -19,5 +19,3 @@ TCPClient = False
 # set IP adress and partner IP adress
 
 IP_Address = '192.168.1.1'
-
-
