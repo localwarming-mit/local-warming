@@ -187,9 +187,18 @@ def flow(cv_image):
 
 def test(cv_image):
     gry = cv2.cvtColor(cv_image, cv.CV_RGB2GRAY)
-    gryi = 255 - gry
+    #gryi = 255 - gry
 
-    ret, thr = cv2.threshold(gryi, 245, 255, cv2.THRESH_BINARY)
+    #Method 1
+    ret, thr = cv2.threshold(gry, 10, 255, cv2.THRESH_BINARY_INV)
+
+    #Method 2
+    #thr = cv2.adaptiveThreshold(gryi, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 3, -1.0)
+
+    #Method 3
+    #mu = gryi.mean()
+    #print "Mu: ", mu
+    #ret, thr = cv2.threshold(gry, mu-130, 255, cv2.THRESH_BINARY_INV)
 
     err = ErodeTrick(thr)
 
@@ -197,6 +206,11 @@ def test(cv_image):
 
     cv2.imshow("edg", err)
     mcs = PickBlob(err)
+
+    #ht.update(mcs)
+    #cv_image = ht.drawFirstEight(cv_image)
+    #mcs  = ht.getConfidentPts()
+
 
     return mcs
 
@@ -216,7 +230,7 @@ curMethod = methods[methodChoice]
 
 ShouldWriteOutput = False
 if ShouldWriteOutput:
-    outf = cv2.VideoWriter("/home/nd/out.avi", cv2.cv.CV_FOURCC(*'XVID'), 20, (640, 480))
+    outf = cv2.VideoWriter("/home/nd/out.mpg", cv2.cv.CV_FOURCC(*'MPEG'), 20, (320, 240))
 
 ht = HumanTracker()
 def image_call():
@@ -228,7 +242,7 @@ def image_call():
             save = CompositeShow("Image window", cam1, cv_image, mcs)
             #print "SHAPE: ", str(save.shape)
             if ShouldWriteOutput:
-                outf.write(save)
+               outf.write(save)
 
         #motioncontrol.control(mc[0], mc[1])
 
