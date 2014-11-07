@@ -43,8 +43,8 @@ def PickBlob(im):
     cntrs = []
     for cntr in conts:
         ara = cv2.contourArea(cntr)
-        if(3000 < ara):
-            #print "ara: ", str(ara)
+        if(1000 < ara):
+            #print "fnd: ", str(ara)
             cntrs.append(cntr)
 
     centroids = []

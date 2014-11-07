@@ -21,6 +21,7 @@ cap = GetCaptureDevice()
 
 calibCap = cap
 fgbg = cv2.BackgroundSubtractorMOG2(200, 30, True) #(10, 5, 0.001, 0.1)
+fgbg = cv2.BackgroundSubtractorMOG()
 
 def Ball(cv_image):
     filtered = FindBall(cv_image)
@@ -66,19 +67,69 @@ def variance(im, mean):
 
     return output
 
+def variance3(im, mean):
+    windowSize = 5
+    begin = windowSize /2
+    output = mean.copy()
+    for r in range(2, im.shape[0]-2):
+        for c in range(2, im.shape[1] - 2):
+            var = 0.0
+            # at pixel r, c - look in window size
+            for i in range(-begin, begin+1):
+                for j in range(-begin, begin+1):
+                    tmp =  float(im[r+i, c+j]) - float(mean[r, c])
+                    var = var + tmp*tmp
+            var = var / float(windowSize*windowSize)
+            output[r,c] = int(var)
+    print "Min: ", output.min(), " and max: ", output.max()
+
+    return output
+
+def variance1(im, mean):
+    windowSize = 5
+    begin = windowSize /2
+
+    output1 = im.astype(numpy.float32)
+    output2 = mean.astype(numpy.float32)
+    for r in range(2, im.shape[0]-2):
+        for c in range(2, im.shape[1] - 2):
+            var = 0.0
+            sum1 = 0.0
+            sum2 = 0.0
+            # at pixel r, c - look in window size
+            for i in range(-begin, begin+1):
+                for j in range(-begin, begin+1):
+                    sum1 = sum1 + float(im[r+i,c+j])*float(im[r+i,c+j])
+                    sum2 = sum2 + float(mean[r+i, c+j])*float(mean[r+i,c+j])
+            output1[r,c] = sum1
+            output2[r,c] = sum2
+    print "Min: ", output1.min(), " and max: ", output1.max()
+    print "Min: ", output2.min(), " and max: ", output2.max()
+
+
+    return output1
+
+
 def variance2(im, mean):
     imf = im.astype(numpy.float32)
+    print "im-Min: ", imf.min(), " and max: ", imf.max()
 
     meanf = mean.astype(numpy.float32)
+    print "mu-Min: ", meanf.min(), " and max: ", meanf.max()
 
     imfsq = imf*imf
+    print "imsq-Min: ", imfsq.min(), " and max: ", imfsq.max()
 
     meanfsq = meanf*meanf
+    print "musq-Min: ", meanfsq.min(), " and max: ", meanfsq.max()
+
 
     kernel = numpy.ones((5,5))
 
     imsqadd = convolve2d(imfsq, kernel, 'same')
     imadd = convolve2d(imf, kernel, 'same')
+    print "cnv-imsq-Min: ", imsqadd.min(), " and max: ", imsqadd.max()
+    print "cnv-im-Min: ", imadd.min(), " and max: ", imadd.max()
 
     out = imsqadd-2*meanf*imadd+25.0*meanfsq
     out = out / 25.0
@@ -94,7 +145,7 @@ def Motion(cv_image):
 
     hsv = cv2.cvtColor(cv_image, cv.CV_RGB2GRAY)
     grey = cv2.boxFilter(hsv, -1, (5, 5))
-    gg = variance2(hsv, grey)
+    gg = variance3(hsv, grey)
     cv2.imshow("gry", gg)
     #cv2.imshow("hue", h)
     #cv2.imshow("sat", s)
@@ -104,13 +155,62 @@ def Motion(cv_image):
     #calculate entropy image
     return []
 
+
+def edge(cv_image):
+    gry = cv2.cvtColor(cv_image, cv.CV_RGB2GRAY)
+    edg = cv2.Sobel(gry, cv.CV_8U, 2,2)
+    filt3 = cv2.blur(edg, (3,3))
+    ret, flt2 = cv2.threshold(filt3, 10, 255, cv2.THRESH_BINARY)
+    flt3 = ErodeTrick(flt2)
+
+    filtered = fgbg.apply(flt3)
+
+    cv2.imshow("edg", filtered)
+
+    return []
+
+prvs = None
+def flow(cv_image):
+    global prvs
+    next = cv2.cvtColor(cv_image,cv2.COLOR_BGR2GRAY)
+
+    if prvs == None:
+       prvs = next
+    flow = cv2.calcOpticalFlowFarneback(prvs,next, None, 0.5, 3, 15, 3, 5, 1.2, 0)
+
+    mag, ang = cv2.cartToPolar(flow[...,0], flow[...,1])
+    hsv[...,0] = ang*180/np.pi/2
+    hsv[...,2] = cv2.normalize(mag,None,0,255,cv2.NORM_MINMAX)
+    rgb = cv2.cvtColor(hsv,cv2.COLOR_HSV2BGR)
+    prvs = next
+    cv2.imshow('frame2',rgb)
+
+def test(cv_image):
+    gry = cv2.cvtColor(cv_image, cv.CV_RGB2GRAY)
+    gryi = 255 - gry
+
+    ret, thr = cv2.threshold(gryi, 245, 255, cv2.THRESH_BINARY)
+
+    err = ErodeTrick(thr)
+
+
+
+    cv2.imshow("edg", err)
+    mcs = PickBlob(err)
+
+    return mcs
+
+
 methods = {
     "bgsub": BgSub,
     "balltrack": Ball,
-    "motion": Motion
+    "motion": Motion,
+    "edge": edge,
+    "flow": flow,
+    "test": test
 }
 
-methodChoice = "motion"
+methodChoice = "test"
 
 curMethod = methods[methodChoice]
 

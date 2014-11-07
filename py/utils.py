@@ -40,9 +40,9 @@ def setupGUI(tag, min_default=128, max_default=128):
 
 
 def ErodeTrick(im):
-    kernel = numpy.ones((10,10),numpy.uint8)
-    im = cv2.erode(im, kernel, iterations=2)
-    im = cv2.dilate(im, kernel, iterations = 2)
+    kernel = numpy.ones((3,3),numpy.uint8)
+    im = cv2.erode(im, kernel, iterations=1)
+    im = cv2.dilate(im, kernel, iterations = 1)
 
     #kernel = numpy.ones((10,10),numpy.uint8)
     #im = cv2.erode(im, kernel, iterations=2)
