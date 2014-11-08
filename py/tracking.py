@@ -41,11 +41,18 @@ def PickBlob(im):
 
     high_bnd, low_bnd = getTrack("", FilterWindowName)
     cntrs = []
+    max_area = 0
+    max_ind = -1
+    i = 0
     for cntr in conts:
         ara = cv2.contourArea(cntr)
         if(1000 < ara):
+            if ara > max_area:
+                max_area = ara
+                max_ind = i
             #print "fnd: ", str(ara)
             cntrs.append(cntr)
+        i = i + 1
 
     centroids = []
     for cntr in cntrs:
@@ -54,4 +61,13 @@ def PickBlob(im):
         mx = mu['m10']/mu['m00']
         my = mu['m01']/mu['m00']
         centroids.append( (mx,my) )
-    return centroids
+
+    if max_ind != -1:
+        mu = cv2.moments(conts[max_ind])
+        #print "MU: " + str(mu)
+        mx = mu['m10']/mu['m00']
+        my = mu['m01']/mu['m00']
+
+        return [ (mx, my) ]
+    return []
+    #return centroids
