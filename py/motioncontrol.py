@@ -1,4 +1,3 @@
-
 # Motion Control Code
 
 #from Adafruit_PWM_Servo_Driver import PWM
@@ -18,16 +17,56 @@ angles = [90,90,90,90,90,90]
 
 #pwm = PWM(0x40, debug=True)
 
+counted = False
+def minuteModuloImpulse(mod):
+    global counted
+    is_mod = time.localtime().tm_min % mod == 0
+    if is_mod:
+        if counted:
+            return False
+        else:
+            counted = True
+            return True
+    elif counted:
+        counted = False;
+    return False
+
+def mode1():
+    print "In Some Mode"
+
+def mode2():
+    print "In other mode"
+
+rotateMode = [mode1, mode2]
+rotateInd = 1
+inMode = None
+def wrapMode():
+    global rotateMode, rotateInd, inMode
+    if inMode == None:
+        inMode = rotateMode[0]
+    #now check if it's time to rotate
+    if minuteModuloImpulse(2):
+        #then rotate
+        inMode = rotateMode[rotateInd]
+        rotateInd = (rotateInd + 1) % len(rotateMode)
+        #print "Rotate now ready for index: ", rotateInd
+        #inMode() # run once
+    #now just run it
+    inMode()
+
+
 def main():
     #setup()
     #fourtyfive()
-    control([(-1,-1),(-1,-1)])
+#    control([(-1,-1),(-1,-1)])
+    while(True):
+        wrapMode()
 
 def control(coords):
 
     # check time to determine which method to run
     time = timestamp.clock()
-    
+
     if time == trackingTime:
         tracking(coords)
         # when running control2, log data
@@ -39,7 +78,7 @@ def control(coords):
     else:
         pass
         #setup()
-        
+
 def coordToAngle(coord,length,height):
     dist = (coord*length)
     angle = (math.atan2(dist,height)*57.0)
@@ -62,7 +101,7 @@ def write(number,angle,status):
     #write servo to angle
     #pwm.setPWM(servoPin,0,int(pulseWidth))
 
-    #turn bulb on or off 
+    #turn bulb on or off
     if status == 'ON':
         pass
         #pwm.setPWM(bulbPin,4096,0)
@@ -82,12 +121,12 @@ def setup():
 def tracking(coords):
 
     angles = [90,90,90,90,90,90]
-    
+
     # coords is a list of tuples coresponding to three points
     height = 1#3.5
     length = 1#height*(3/4)
     yOffset = 0
-    xOffset = 0 #could be -height/2 depending on side 
+    xOffset = 0 #could be -height/2 depending on side
     xPos = 0
     yPos = 0
 
@@ -100,7 +139,7 @@ def tracking(coords):
         if coord[0] == -1:
             pass
         # otherwise, check to see what bulb the x coordinate corresponds to
-        else:   
+        else:
             xPos = coord[0] - xOffset
             yPos = coord[1] - yOffset
 
@@ -109,7 +148,7 @@ def tracking(coords):
                 angles[nums[i]]=coordToAngle(yPos,length,height)
         i+=1
 
-    # handle assinging the angles for bulbs directly adjacent to on bulbs 
+    # handle assinging the angles for bulbs directly adjacent to on bulbs
 
     for j in range(0,len(angles)):
         print j
@@ -119,7 +158,7 @@ def tracking(coords):
         elif j==5:
             if angles[j] != 90 and angles[j-1] == 90:
                 angles[j-1] = angles[j]/2
-        else:   
+        else:
             if angles[j] != 90 and angles[j-1] == 90:
                 angles[j-1] = angles[j]/2
                 if angles[j+1] == 90:
@@ -144,7 +183,7 @@ def wave(delay,array):
     #arrays 1&2 on one side
     #arrays 4&5 on the other
     #array 3 is transition
-    
+
     if array == 1 or array == 2:
         for i in range(0,6):
             angle = 60
@@ -169,7 +208,7 @@ def wave(delay,array):
 # writes a random bulb to a random angle with random delay
 
 def spots(delay):
-    
+
     randomBulb = random.random()
     randomAngle = random.random()
     randomDelay = random.random()
@@ -194,9 +233,9 @@ def fourtyfive():
                 write(j,45,'OFF')
             else:
                 write(j,135,'OFF')
-                
+
         time.sleep(1)
-        
+
         for k in range(0,6):
             if k%2 == 0:
                 write(k,45,'OFF')
@@ -205,5 +244,5 @@ def fourtyfive():
 
         time.sleep(1)
 
-if __name__ == "__main__":  
+if __name__ == "__main__":
     main()

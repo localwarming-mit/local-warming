@@ -232,11 +232,14 @@ ShouldWriteOutput = False
 if ShouldWriteOutput:
     outf = cv2.VideoWriter("/home/nd/out.mpg", cv2.cv.CV_FOURCC(*'MPEG'), 20, (320, 240))
 
+rect = numpy.asarray( [ [ (0,0), (160, 0), (160, 240), (0, 240) ]] )
 ht = HumanTracker()
 def image_call():
     global FilterWindowName, curMethod
     ret, cv_image = cap.read()
     if(ret):
+        #cv2.rectangle(cv_image,(0,0),(160,240),cv.Scalar(255,255,255))
+        cv2.fillPoly(cv_image, rect, cv.Scalar(255,255,255))
         mcs = curMethod(cv_image)
         if GlobalSettings.imdebug:
             save = CompositeShow("Image window", cam1, cv_image, mcs)
