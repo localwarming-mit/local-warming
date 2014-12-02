@@ -1,4 +1,4 @@
-import cv2, cv
+import cv2
 import time
 
 from camera import Camera, NeedsToSave, cam1
@@ -10,9 +10,6 @@ from GlobalSettings import FilterWindowName
 from viz import CompositeShow
 from tracking import PickBlob, FindBall
 from capture import GetCaptureDevice
-
-from scipy.signal import convolve2d
-import numpy
 #import motioncontrol
 
 current_milli_time = lambda: round(time.time() * 1000)
@@ -20,8 +17,7 @@ current_milli_time = lambda: round(time.time() * 1000)
 cap = GetCaptureDevice()
 
 calibCap = cap
-fgbg = cv2.BackgroundSubtractorMOG2(200, 30, True) #(10, 5, 0.001, 0.1)
-fgbg = cv2.BackgroundSubtractorMOG()
+fgbg = cv2.BackgroundSubtractorMOG(200, 30, True) #(10, 5, 0.001, 0.1)
 
 def Ball(cv_image):
     filtered = FindBall(cv_image)
@@ -49,204 +45,31 @@ def BgSub(cv_image):
     mcs  = ht.getConfidentPts()
     return mcs
 
-def variance(im, mean):
-    windowSize = 5
-    begin = windowSize /2
-    output = mean.copy()
-    for r in range(2, im.shape[0]-2):
-        for c in range(2, im.shape[1] - 2):
-            var = 0.0
-            # at pixel r, c - look in window size
-            for i in range(-begin, begin+1):
-                for j in range(-begin, begin+1):
-                    tmp =  float(im[r+i, c+j]) - float(mean[r+i, c+j])
-                    var = var + tmp*tmp
-            var = var / float(windowSize*windowSize)
-            output[r,c] = int(var)
-    print "Min: ", output.min(), " and max: ", output.max()
-
-    return output
-
-def variance3(im, mean):
-    windowSize = 5
-    begin = windowSize /2
-    output = mean.copy()
-    for r in range(2, im.shape[0]-2):
-        for c in range(2, im.shape[1] - 2):
-            var = 0.0
-            # at pixel r, c - look in window size
-            for i in range(-begin, begin+1):
-                for j in range(-begin, begin+1):
-                    tmp =  float(im[r+i, c+j]) - float(mean[r, c])
-                    var = var + tmp*tmp
-            var = var / float(windowSize*windowSize)
-            output[r,c] = int(var)
-    print "Min: ", output.min(), " and max: ", output.max()
-
-    return output
-
-def variance1(im, mean):
-    windowSize = 5
-    begin = windowSize /2
-
-    output1 = im.astype(numpy.float32)
-    output2 = mean.astype(numpy.float32)
-    for r in range(2, im.shape[0]-2):
-        for c in range(2, im.shape[1] - 2):
-            var = 0.0
-            sum1 = 0.0
-            sum2 = 0.0
-            # at pixel r, c - look in window size
-            for i in range(-begin, begin+1):
-                for j in range(-begin, begin+1):
-                    sum1 = sum1 + float(im[r+i,c+j])*float(im[r+i,c+j])
-                    sum2 = sum2 + float(mean[r+i, c+j])*float(mean[r+i,c+j])
-            output1[r,c] = sum1
-            output2[r,c] = sum2
-    print "Min: ", output1.min(), " and max: ", output1.max()
-    print "Min: ", output2.min(), " and max: ", output2.max()
-
-
-    return output1
-
-
-def variance2(im, mean):
-    imf = im.astype(numpy.float32)
-    print "im-Min: ", imf.min(), " and max: ", imf.max()
-
-    meanf = mean.astype(numpy.float32)
-    print "mu-Min: ", meanf.min(), " and max: ", meanf.max()
-
-    imfsq = imf*imf
-    print "imsq-Min: ", imfsq.min(), " and max: ", imfsq.max()
-
-    meanfsq = meanf*meanf
-    print "musq-Min: ", meanfsq.min(), " and max: ", meanfsq.max()
-
-
-    kernel = numpy.ones((5,5))
-
-    imsqadd = convolve2d(imfsq, kernel, 'same')
-    imadd = convolve2d(imf, kernel, 'same')
-    print "cnv-imsq-Min: ", imsqadd.min(), " and max: ", imsqadd.max()
-    print "cnv-im-Min: ", imadd.min(), " and max: ", imadd.max()
-
-    out = imsqadd-2*meanf*imadd+25.0*meanfsq
-    out = out / 25.0
-    out = out.astype(numpy.int8)
-    print "Min: ", out.min(), " and max: ", out.max()
-    return out
-
-
-def Motion(cv_image):
-    #turn in to hsv
-    #hsv = cv2.cvtColor(cv_image, cv.CV_RGB2HSV)
-    #[h, s, v] = cv2.split(hsv)
-
-    hsv = cv2.cvtColor(cv_image, cv.CV_RGB2GRAY)
-    grey = cv2.boxFilter(hsv, -1, (5, 5))
-    gg = variance3(hsv, grey)
-    cv2.imshow("gry", gg)
-    #cv2.imshow("hue", h)
-    #cv2.imshow("sat", s)
-    #cv2.imshow("val", v)
-    #find most stable image
-    #look at frame differences
-    #calculate entropy image
-    return []
-
-
-def edge(cv_image):
-    gry = cv2.cvtColor(cv_image, cv.CV_RGB2GRAY)
-    edg = cv2.Sobel(gry, cv.CV_8U, 2,2)
-    filt3 = cv2.blur(edg, (3,3))
-    ret, flt2 = cv2.threshold(filt3, 10, 255, cv2.THRESH_BINARY)
-    flt3 = ErodeTrick(flt2)
-
-    filtered = fgbg.apply(flt3)
-
-    cv2.imshow("edg", filtered)
-
-    return []
-
-prvs = None
-def flow(cv_image):
-    global prvs
-    next = cv2.cvtColor(cv_image,cv2.COLOR_BGR2GRAY)
-
-    if prvs == None:
-       prvs = next
-    flow = cv2.calcOpticalFlowFarneback(prvs,next, None, 0.5, 3, 15, 3, 5, 1.2, 0)
-
-    mag, ang = cv2.cartToPolar(flow[...,0], flow[...,1])
-    hsv[...,0] = ang*180/np.pi/2
-    hsv[...,2] = cv2.normalize(mag,None,0,255,cv2.NORM_MINMAX)
-    rgb = cv2.cvtColor(hsv,cv2.COLOR_HSV2BGR)
-    prvs = next
-    cv2.imshow('frame2',rgb)
-
-def test(cv_image):
-    gry = cv2.cvtColor(cv_image, cv.CV_RGB2GRAY)
-    #gryi = 255 - gry
-
-    #Method 1
-    ret, thr = cv2.threshold(gry, 10, 255, cv2.THRESH_BINARY_INV)
-
-    #Method 2
-    #thr = cv2.adaptiveThreshold(gryi, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 3, -1.0)
-
-    #Method 3
-    #mu = gryi.mean()
-    #print "Mu: ", mu
-    #ret, thr = cv2.threshold(gry, mu-130, 255, cv2.THRESH_BINARY_INV)
-
-    err = ErodeTrick(thr)
-
-
-
-    cv2.imshow("edg", err)
-    mcs = PickBlob(err)
-
-    #ht.update(mcs)
-    #cv_image = ht.drawFirstEight(cv_image)
-    #mcs  = ht.getConfidentPts()
-
-
-    return mcs
-
-
 methods = {
     "bgsub": BgSub,
-    "balltrack": Ball,
-    "motion": Motion,
-    "edge": edge,
-    "flow": flow,
-    "test": test
+    "balltrack": Ball
 }
 
-methodChoice = "test"
+methodChoice = "bgsub"
 
 curMethod = methods[methodChoice]
 
 ShouldWriteOutput = False
 if ShouldWriteOutput:
-    outf = cv2.VideoWriter("/home/nd/out.mpg", cv2.cv.CV_FOURCC(*'MPEG'), 20, (320, 240))
+    outf = cv2.VideoWriter("/home/nd/out.avi", cv2.cv.CV_FOURCC(*'XVID'), 20, (640, 480))
 
-rect = numpy.asarray( [ [ (0,0), (160, 0), (160, 240), (0, 240) ]] )
 ht = HumanTracker()
 def image_call():
     global FilterWindowName, curMethod
-    ret, cv_image = cap.read()
+    ret, cv_image = cap.retrieve()
     if(ret):
-        #cv2.rectangle(cv_image,(0,0),(160,240),cv.Scalar(255,255,255))
-        cv2.fillPoly(cv_image, rect, cv.Scalar(255,255,255))
         mcs = curMethod(cv_image)
         if GlobalSettings.imdebug:
             save = CompositeShow("Image window", cam1, cv_image, mcs)
             #print "SHAPE: ", str(save.shape)
             if ShouldWriteOutput:
-               outf.write(save)
-
+                outf.write(save)
+	print 'coordinate: '+str(mcs)
         #motioncontrol.control(mc[0], mc[1])
 
         #correct the frame
