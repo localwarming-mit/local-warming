@@ -2,6 +2,7 @@ import cv
 import cv2
 import GlobalSettings
 from camera import Uncalibrated
+import camera
 
 def CompositeShow(windowName, camera, image, pts=[]):
     global Uncalibrated
@@ -12,7 +13,7 @@ def CompositeShow(windowName, camera, image, pts=[]):
     cv2.namedWindow(windowName)
     comp = image.copy() #cv.CloneImage(image)
     if(Uncalibrated):
-        CalibrateCameras(comp)
+        #CalibrateCameras(comp)
         Uncalibrated = False
 
     if(GlobalSettings.showGrid):
