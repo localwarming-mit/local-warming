@@ -159,6 +159,7 @@ Uncalibrated = not reduce(lambda a,b: a and b, [x.calibrated for x in cameras])
 
 if(not Uncalibrated):
    [cam.CalibrateFunc() for cam in cameras]
+
 def CalibrateCameras(imageOverRide = None):
     global NeedsToSave, cameras, Uncalibrated
     if(Uncalibrated):
