@@ -22,7 +22,7 @@ tcp = TCP()
 #initiate I2C communication between pi and pwm driver
 motioncontrol.setup()
 
-# background subtraction method which is no longer used but potentially could be revived. 
+# background subtraction method which is no longer used but potentially could be revived
 def BgSub(cv_image):
     filtered = fgbg.apply(cv_image)
     flt2 = ErodeTrick(filtered)
