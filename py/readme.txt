@@ -26,8 +26,11 @@ angle and on/off commands sent over I2C to the PWM driver
 
 Timestamp.py - Set of methods for saving timestamps and parsing through timestamps
 
-FUNCTION
----------
+CORE FUNCTIONALITY
+-------------------
+
+NEWERTEST.PY
+-------------
 
 In order to run the code, begin by running NewerTest.py
 Keep in mind that certain files such as the Adafruit Raspberry Pi files
@@ -62,3 +65,59 @@ Also important to know is all of the cv.imshow statements such as this one in th
  in order to debug the code. However, this will not work when running the code from 
  the command line since they open a window so it must be done when in the Pi's GUI mode
  
+MOTIONCONTROL.PY
+-----------------
+
+This code can either be used independently of NewerTest.py in order to directly control the bulbs
+or can be called within NewerTest.py in order to control the arrays in real time using image processing.
+Using the code without NewerTest.py is particularly useful when mechanically calibrating the arrays.
+
+Before running the code, make sure support files like Adafruit_PWM_Servo_Driver and the I2C files are there
+
+When running the code independently, use the main() method to call any of the motion control methods.
+
+Below is a short desctiption of the main methods:
+
+control() - designed to be able to run different functions depending on the timestamp
+
+setup() - sets all of the bulbs to 90 degrees and turns the bulbs off, useful for calibrating
+
+fourtyfive() - sweeps the bulbs in a 45-45 pattern, useful for testing servos
+
+tracking(coords) - takes coordinates and translates them to angle commands
+
+write() - sends on/off and angle commands over I2C to the pwm driver
+
+See the motioncontrol.py file for descriptions of the other minor methods
+
+Before calibrating the motion of the arrays it's important to understand way in which the
+coordinate grid is defined.
+
+- The x coordinate is defined as the axis parallel to the array (aka the point along the array)
+- The y coordinate is defined as the axis perpendicular to the array (aka the distance from the array)
+- The z coodinate is defined as the axis from the bulb vertically. Typical bulb to person distance is 2 meters
+
+This is the way the x,y axis is defined (looking down from above the floor)
+
+ 0                                                                                      0               
+0 --------------------------------------x axis------------------------------------------ 320    ^
+ |                                                                                       |      |
+ |                                                                                       |      |
+ |                                                                                       |      |
+y axis                                                                                   |    y offset
+ |                                                                                       |      |
+ |                                                                                       |      |
+ |****************************************************************************************      |
+ |              *              *              *              *             *             |      |             
+ |    bulb 6    *    bulb 5    *    bulb 4    *    bulb 3    *    bulb 2   *    bulb 1 CAMERA   v
+ |              *              *              *              *             *             |       
+ |***************************************************************************************|
+ |                                                                                       |
+ |                                                                                       |
+ |<-------------------------------------x offset---------------------------------------->|
+ |                                                                                       |
+ |                                                                                       |
+ |                                                                                       |
+ 240-------------------------------------------------------------------------------------320
+  0                                                                                     240
+
