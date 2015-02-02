@@ -19,8 +19,10 @@ fgbg = cv2.BackgroundSubtractorMOG(200, 30, 0.001, 0.1)
 ht = HumanTracker()
 
 tcp = TCP()
+#initiate I2C communication between pi and pwm driver
 motioncontrol.setup()
 
+# background subtraction method which is no longer used but potentially could be revived 
 def BgSub(cv_image):
     filtered = fgbg.apply(cv_image)
     flt2 = ErodeTrick(filtered)
@@ -34,6 +36,8 @@ def BgSub(cv_image):
     return filtered #cv_image 
     #return mcs
 
+# This is the current motion tracking method, which uses a simple threshold to
+# determine a coordinate to track, if any
 def test(cv_image):
         #create camera blind spot to avoid blob detection in non-tracking portion of canera field  
         rect = cv2.rectangle(cv_image,(200,0),(320,240),cv.Scalar(255,255,255),-1)
@@ -45,9 +49,11 @@ def test(cv_image):
 
 	ret,thr = cv2.threshold(gryi,215,255,cv2.THRESH_BINARY)
 
+	# erode trick reduces blob size and then re-expands in order to eliminate smaller blobs
 	err = ErodeTrick(thr)
 
 	#cv2.imshow('frame',thr)
+	#call the function that picks the biggest blob
 	mcs = PickBlob(err)
 
 	#return err
@@ -72,22 +78,35 @@ with picamera.PiCamera() as camera:
        #camera.shutter_speed = 600000
        #camera.exposure_mode = 'off'
        #camera.iso = 800
+       
+       #this while loop is the 'meat' of the code which continuously 
+       #runs object tracking (called 'test') and motion control
        while(True):
            camera.capture(stream, 'bgr', use_video_port=True)
            #cv2.imshow('frame', stream.array)
 		
+	   #set default coordinates to 352,264 since when divided by 320 and 240
+	   #the normalized x,y values will be 1.1,1.1 and thus will not be
+	   #processed by the motion control function if test does not find a point
+	   
 	   (x,y) = (352,264)
 
+	   # calls the function which determines a coordinate (if any) or a tracked object
 	   x,y = test(stream.array)
 	   x = x/320.0
 	   y = y/240.0
 	   
 	   print x,y
 	   #tcp = TCP()
-	   (x2,y2) = tcp.server()		
+	   (x2,y2) = tcp.server()
+	   #send the coordinate(s) to motion control for tracking. If coordinate is 1.1,1.1
+	   #the motion control function will default to setting all bulbs to 90 degrees and off
 	   motioncontrol.tracking([(x,y),(x2,y2)])
 	   	
            #cv2.imshow('frame',stream.array)
+           
+           #this bit of code is needed in order to be able to capture the next image
+           #not sure exactly what it does
            if cv2.waitKey(1) & 0xFF == ord('q'):
                break
            stream.seek(0)
