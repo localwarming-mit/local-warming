@@ -1,0 +1,35 @@
+So here are the instructions for how to set up the raspberry pis with all the tools we need in order to run the code.
+
+First, you'll need to install the OS. Go to this site and download the NOOBS offline and network install on your personal computer:
+
+http://www.raspberrypi.org/downloads/
+
+Then unzip the file and copy the contents onto the SD card. Then take the SD card and inset it into the pi. The SD card should be a microSD. It should have an adapter that plugs into a regular SD slot on the computer, and then the micro SD plugs in by itself into the raspberry pi.
+
+Go through the OS setup instructions. Choose Raspbian (first option) when it asks what OS to install.
+
+Then some configuration setting will pop up which you won't have to worry about and can go down and click finish.
+
+When it reboots, it will ask you to log in, the default username is pi and password is raspberry.
+
+Now you should see a screen that has a command line which you'll type commands into in order to use the pi.
+
+You'll need to be connected to the internet before you can go through the next steps, so start by connecting the ethernet cable and trying something like:
+
+ping www.google.com
+
+If you get a message saying something like 'host unreachable' then there's an issue with the connection. It's possible that there's an issue with MIT's secure network since the pi won't be registered. You could try opening the raspberry pi GUI by typing 'startx' then navigate to the internet browser and see if this page pops up in which case you can register your pi like any other computer. If that doesn't work I'd try going to the media lab or the EECS buildings and try to get an ethernet connection on their networks. I'm not sure about Wellesley's network, but I'd imagine it's a similar process.
+
+Once you have an internet connection, follow the instructions on these pages in order to setup the GPIO (general purpose input/output) pins on the pi and install the I2C (a type of serial communication protocol) library which will allow the pi to communicate to the servos and bulbs.
+
+https://learn.adafruit.com/adafruits-raspberry-pi-lesson-4-gpio-setup/adafruit-pi-code
+
+Next you'll build openCV on the pi. 
+
+Type the following two commands:
+
+sudo apt-get install python-opencv
+
+sudo apt-get install python-picamera
+
+Now the Raspberry Pi should be ready to run the code!
