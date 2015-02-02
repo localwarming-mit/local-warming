@@ -90,7 +90,7 @@ write() - sends on/off and angle commands over I2C to the pwm driver
 
 See the motioncontrol.py file for descriptions of the other minor methods
 
-Before calibrating the motion of the arrays it's important to understand way in which the
+Before calibrating the motion of the arrays it's important to understand the way in which the
 coordinate grid is defined.
 
 - The x coordinate is defined as the axis parallel to the array (aka the point along the array)
@@ -118,12 +118,13 @@ y axis                                                                          
  |                                                                                       |
  |                                                                                       |
  |                                                                                       |
- 240-------------------------------------------------------------------------------------320
-  0                                                                                     240
+ 240-------------------------------------------------------------------------------------320 px  (320x240 pixels)
+  0                                                                                     240 px
   
-Note: The x and y axis are normalized before being sent to the motioncontrol code, such that
-both axis' default to a maximum coordinate of 1.0. Thus a coordinate of 1.1 can be sent 
-as a 'dummy' to indicate the no coordinate has been detected by motion tracking
+Note: The x and y axis are normalized from camera pixels before being sent to the 
+motioncontrol code, such that both axis' default to a maximum coordinate of 1.0.  <-- see lines 96-97 of NewerTest.py
+Thus a coordinate of 1.1 can be sent  as a 'dummy' to indicate that no coordinate 
+has been detected by motion tracking
 
 This is the way the y angle is calculated (looking from the side of the array)
        ___
