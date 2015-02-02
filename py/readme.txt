@@ -120,4 +120,42 @@ y axis                                                                          
  |                                                                                       |
  240-------------------------------------------------------------------------------------320
   0                                                                                     240
+  
+Note: The x and y axis are normalized before being sent to the motioncontrol code, such that
+both axis' default to a maximum coordinate of 1.0. Thus a coordinate of 1.1 can be sent 
+as a 'dummy' to indicate the no coordinate has been detected by motion tracking
 
+This is the way the y angle is calculated (looking from the side of the array)
+       ___
+      | O |
+      |   | <- bulb
+  ____|   |____
+ |_____________|
+  ^     |\
+  |     | \
+  |     |_/\
+  |     |(theta)   
+  |     |    \
+  |     |     \             height is defined as the distance from the bulb to the average person's chest
+  |     |      \                                          (typically 2.0 meters)
+height  |       \
+  |     |        \
+  |     |         \                                   theta = arctan(ydistance/height)
+  |     |          \
+  |     |           \    ____          this angle is either added or subtracted to the default (90 degrees)
+  |     |            \  /    \        in order to give an angle command between 45 and 135 degrees (90 +/- 45) 
+  |     |             \ \    /
+  v     |__y distance__\ \__/
+        90       \_______/  \_______/
+                         |  |
+                         |  |
+                         |__|
+                         /  \
+                        /    \
+                        |    |       
+                      __|    |__
+                      
+
+Using these definitions for the coodinate grid, the motion control code first determines an x coordinate simply by
+dividing the x axis into six sections corresponding to the six bulbs to find which bulb(s) must be actuated. Then,
+the angle for the given bulb is calculated using the y position and finding the angle with the arctan function above.
