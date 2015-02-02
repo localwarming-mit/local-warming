@@ -26,6 +26,8 @@ def main():
     #fourtyfive()
     tracking([(0.03,0.4),(0.8,0.8)])
 
+# method is designed to be able to use timestamps in order to
+# pick and chose which methods to run at given times
 def control(coords):
 
     # check time to determine which method to run
@@ -42,7 +44,8 @@ def control(coords):
     else:
         pass
         #setup()
-        
+
+# uses arctangent function to convert the y distance from the array into an angle        
 def distToAngle(dist,height):
     angle = (math.atan2(dist,height)*57.0)
     return angle
@@ -69,7 +72,8 @@ def write(number,angle,status):
         pwm.setPWM(bulbPin,4096,0)
     else:
         pwm.setPWM(bulbPin,0,0)
-
+        
+# sets all of the angles to 90 and turns the bulbs off (must be run first)
 def setup():
     pwm.setPWMFreq(60)
     for i in range(0,6):
@@ -78,6 +82,11 @@ def setup():
 
 # main control method for bulbs
 # takes coordinate list of tuples and writes to PWM driver
+# the x coordinate is defined as the axis parallel to the array (aka the point along the array)
+# the y coordinate is defined as the axis perpendicular to the array (aka the distance from the array)
+# the z coodinate is defined as the axis from the bulb vertically. Typical bulb to person distance is 2 meters
+
+# see readme.txt for a description of the coordinate grid and angle calculations
 
 def tracking(coords):
     
@@ -85,10 +94,12 @@ def tracking(coords):
     angles = [0,0,0,0,0,0]
     
     # coords is a list of tuples coresponding to three points
-    height = 2.0
+    height = 2.0 # z dimension distance from bulb to average person's height
     length = height*(0.75)
     print length
-    yOffset = length/2.0
+    # depending on the location of the camera there will be an offset in the x and y axis
+    # this also depends on the way the coordinate axis is defined
+    yOffset = length/2.0 
     xOffset = 0.5
     xPos = 0
     yPos = 0
