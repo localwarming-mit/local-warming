@@ -1,20 +1,22 @@
-# Data Logging
-
+import smbus
 import time
 import datetime
-import timestamp
+import math
 
-# create a file object: open it with "write" mode
+#This program takes an x,y coordinate and updates the point on a .txt file
+#along with a timestamp from the Raspberry Pi clock (synced with RTC module)
 
 def main():
-    time = timestamp.timestamp()
-    log([(0,1,0.1),(0.2,0.4)],time,'-273','98')
+	log()
 
-def log(coords,time,temp,humidity):
-    FileName = 'Log.txt'
-    File = open(FileName,"a")
-    File.write(str(coords)+';'+time+';'+temp+';'+humidity+'\n')
-    File.close()
+def log(x,y):
+	file = open('Coordinates.txt','a')
+	now = datetime.datetime.now()
+	timestamp = now.strftime('%Y%m/%d %H:%M')
+	data = 'point: ' + str(x) + ',' +str(y) + ' time: ' + str(timestamp)
+	file.write(data)
+	file.close
+	print data
 
-if __name__ == "__main__":
-    main()
+if __name__ == "main":
+	main()
